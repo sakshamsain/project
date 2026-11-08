@@ -829,7 +829,7 @@ docs = [
 ]
 ingest = [
     { name = "bse" },
-    { name = "httpx" },
+    { name = "httpx", extra = ["http2"] },
     { name = "lxml" },
     { name = "nse" },
     { name = "pandas" },
@@ -853,7 +853,7 @@ dev = [
 requires-dist = [
     { name = "bse", marker = "extra == 'ingest'", specifier = ">=3.3" },
     { name = "fastembed", marker = "extra == 'docs'", specifier = ">=0.3" },
-    { name = "httpx", marker = "extra == 'ingest'", specifier = ">=0.27" },
+    { name = "httpx", extras = ["http2"], marker = "extra == 'ingest'", specifier = ">=0.27" },
     { name = "litellm", marker = "extra == 'llm'", specifier = ">=1.40" },
     { name = "lxml", marker = "extra == 'ingest'", specifier = ">=5.0" },
     { name = "modal", marker = "extra == 'deploy'", specifier = ">=0.64" },

@@ -10,7 +10,7 @@ dependencies = [
 
 [project.optional-dependencies]
 ingest = [
-  "httpx>=0.27",
+  "httpx[http2]>=0.27",
   "nse>=5.1",
   "bse>=3.3",
   "yfinance>=0.2",
@@ -50,5 +50,5 @@ packages = ["finn"]
 
 [[tool.mypy.overrides]]
 # Third-party packages that ship without type information.
-module = ["yfinance.*", "nse.*", "bse.*", "selectolax.*", "fitz.*", "pdfplumber.*", "fastembed.*", "litellm.*"]
+module = ["yfinance.*", "nse.*", "bse.*", "selectolax.*", "fitz.*", "pdfplumber.*", "fastembed.*", "litellm.*", "sentry_sdk.*"]
 ignore_missing_imports = true

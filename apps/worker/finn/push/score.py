@@ -108,6 +108,15 @@ def score(f: EventFeatures, user_weight: float = 1.0) -> Breakdown:
     return Breakdown(base, user_weight, size, reaction, novelty, floor, round(s, 4))
 
 
+def absolute_tier(b: Breakdown) -> str:
+    """The tier an event earns on its own, before the front page's cap is applied."""
+    if b.score >= FRONT_THRESHOLD:
+        return "front"
+    if b.score >= ONELINER_THRESHOLD or b.floor_applied:
+        return "oneliner"
+    return "folded"
+
+
 @dataclass(frozen=True, slots=True)
 class Ranked:
     key: str

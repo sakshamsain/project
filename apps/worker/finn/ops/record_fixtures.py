@@ -135,10 +135,66 @@ def fetch() -> dict[str, str]:
     return out
 
 
+@app.function(image=image, timeout=300)
+def fetch_extra() -> dict[str, str]:
+    """Second batch: index closes, corporate actions, and the size of a full market day."""
+    import httpx
+
+    today = date.today()
+    day = _last_weekday_before(today)
+    api = httpx.Client(
+        headers={"User-Agent": UA, "Accept": "application/json,*/*", "Accept-Language": "en-US"},
+        http2=True,
+        follow_redirects=True,
+        timeout=60,
+    )
+    files = httpx.Client(headers={"User-Agent": UA}, follow_redirects=True, timeout=60)
+    base = "https://www.nseindia.com/api"
+    fmt = "%d-%m-%Y"
+    out: dict[str, str] = {}
+
+    dmy = day.strftime("%d%m%Y")
+    idx = files.get(f"https://nsearchives.nseindia.com/content/indices/ind_close_all_{dmy}.csv")
+    idx.raise_for_status()
+    lines = idx.text.splitlines()
+    keep = [ln for ln in lines[1:] if ln.split(",")[0].strip().lower() in {"nifty 50", "nifty 500"}]
+    out[f"nse/ind_close_all_{dmy}_sample.csv"] = "\n".join([lines[0], *keep, *lines[1:6]]) + "\n"
+
+    actions = api.get(
+        f"{base}/corporates-corporateActions",
+        params={
+            "index": "equities",
+            "from_date": (today - timedelta(days=14)).strftime(fmt),
+            "to_date": (today + timedelta(days=14)).strftime(fmt),
+        },
+    )
+    actions.raise_for_status()
+    out["nse/corporate_actions_4w_sample.json"] = json.dumps(actions.json()[:40], indent=1)
+
+    full = api.get(
+        f"{base}/corporate-announcements",
+        params={"index": "equities", "from_date": day.strftime(fmt), "to_date": day.strftime(fmt)},
+    )
+    full.raise_for_status()
+    rows = full.json()
+    out["nse/announcements_market_1d_stats.json"] = json.dumps(
+        {
+            "day": day.isoformat(),
+            "rows": len(rows),
+            "bytes": len(full.content),
+            "with_voice_summary": sum(1 for r in rows if r.get("voiceSummary")),
+            "distinct_symbols": len({r.get("symbol") for r in rows}),
+        },
+        indent=1,
+    )
+    return out
+
+
 @app.local_entrypoint()
-def main() -> None:
+def main(extra: bool = False) -> None:
     root = _fixtures_dir()
-    for name, text in fetch.remote().items():
+    batch = fetch_extra.remote() if extra else fetch.remote()
+    for name, text in batch.items():
         path = root / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")

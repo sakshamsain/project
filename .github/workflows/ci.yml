@@ -7,13 +7,25 @@ on:
 jobs:
   worker:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      # Database tests create a fresh finn_it database here and apply every migration.
+      FINN_TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
     defaults:
       run:
         working-directory: apps/worker
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-      - run: uv sync --group dev --extra ingest
+      - run: uv sync --group dev --extra ingest --extra db
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy
