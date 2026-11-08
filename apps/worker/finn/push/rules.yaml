@@ -202,6 +202,16 @@
     - '(bags?|wins?|received|secures?) (an? )?(new )?(orders?|contracts?)'
     - 'order (win|inflow)'
 
+- id: results_press_release
+  # A release that reports the quarter's numbers belongs with the results it announces.
+  category: results
+  attributes: {stage: press_release}
+  any:
+    - '\b(reports?|announces?|posts?|delivers?|records?|achieves?)\b.{0,80}\b(results|performance|revenue|ebitda|pat|profits?|earnings)\b.{0,60}\b(q[1-4]|h[12]|9m|quarter|half[- ]year|fy\s?''?\d{2})'
+    - '\b(q[1-4]|h[12]|9m)\s*-?\s*fy\s*''?\d{2}\b.{0,40}\b(results|performance)\b'
+    - '\b(results|performance)\b.{0,40}\b(q[1-4]|h[12]|9m)\s*-?\s*fy\s*''?\d{2}\b'
+    - '\b(pat|profits?|revenues?|ebitda|sales)\b.{0,60}\b(q[1-4]|h[12]|9m)\s*-?\s*fy\s*''?\d{2}\b'
+
 - id: agm_egm
   category: agm_egm
   any: ['annual general meeting', '\bagm\b', 'extra-?ordinary general meeting', '\begm\b', 'shareholders meeting']

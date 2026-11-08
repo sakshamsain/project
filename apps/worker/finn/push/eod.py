@@ -24,7 +24,13 @@ from finn.sources.nse import BoardMeeting, CorporateAction, DailyBar, IndexClose
 
 BENCHMARK = "NIFTY 50"
 STORED_INDICES = ("NIFTY 50", "NIFTY 500", "NIFTY MIDCAP 150", "NIFTY SMALLCAP 250")
-EOD_THRESHOLDS = Thresholds(delivery_multiple=1.5)
+# Anomalies are stored at these floors; each profile's own thresholds (at or above the
+# floors, defaulting to USER_DEFAULTS) filter them at read time, so changing a setting
+# never needs a recompute.
+FLOOR_THRESHOLDS = Thresholds(
+    volume_multiple=1.5, price_move_pct=3.0, sigma=2.0, delivery_multiple=1.3
+)
+USER_DEFAULTS = Thresholds(delivery_multiple=1.5)
 
 
 def isins_for(conn: Conn, symbols: Iterable[str]) -> dict[str, str]:
@@ -208,7 +214,7 @@ class EodReport:
         }
 
 
-def detect_anomalies(conn: Conn, trade_date: date, t: Thresholds = EOD_THRESHOLDS) -> EodReport:
+def detect_anomalies(conn: Conn, trade_date: date, t: Thresholds = FLOOR_THRESHOLDS) -> EodReport:
     report = EodReport(trade_date)
     rows = fetch_all(
         conn,

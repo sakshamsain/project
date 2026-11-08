@@ -76,6 +76,8 @@ def base_weight(category: str, attributes: Mapping[str, str]) -> float:
     if category == "results":
         stage_weights = {"intimation": 0.10, "newspaper_ad": 0.0, "presentation": 0.25}
         w = stage_weights.get(attributes.get("stage", ""), w)
+    if category == "M&A" and attributes.get("kind") == "internal":
+        w = 0.30
     if category == "press_release":
         kind_weights = {"order_win": 0.45, "disruption": 0.65, "clarification": 0.30}
         w = kind_weights.get(attributes.get("kind", ""), w)

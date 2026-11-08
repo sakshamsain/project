@@ -105,6 +105,16 @@ def _squash(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+_INTERNAL = re.compile(
+    r"wholly[- ]owned|\bwos\b|step[- ]down subsidiar|between the company and its subsidiar", re.I
+)
+
+# Subjects that name a broad kind ("Press Release") rather than what happened: when one
+# of these rules matches the subject, the filing's own text gets a chance at a more
+# specific rule.
+BROAD_RULES = frozenset({"press_release"})
+
+
 def is_generic(subject: str) -> bool:
     s = _squash(subject).lower()
     s = re.sub(r"\s*-\s*xbrl$", "", s)
@@ -131,6 +141,8 @@ def extract_attributes(category: str, text: str) -> dict[str, str]:
         direction = _first(_DIRECTIONS, text)
         if direction:
             attrs["direction"] = direction
+    elif category == "M&A" and _INTERNAL.search(text):
+        attrs["kind"] = "internal"  # a reshuffle inside the group, not a deal with outsiders
     return attrs
 
 
@@ -155,6 +167,10 @@ def classify(
         hit = _match(active, _squash(f"{subject} {exchange_category or ''}"))
     if hit is None:
         hit = _match(active, full)
+    elif hit.id in BROAD_RULES:
+        specific = _match([r for r in active if r.id not in BROAD_RULES], full)
+        if specific is not None and specific.category != "unclassified":
+            hit = specific
     if hit is None:
         return None
     attrs = {**extract_attributes(hit.category, full), **hit.attributes}

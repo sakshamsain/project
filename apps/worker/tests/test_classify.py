@@ -126,3 +126,51 @@ def test_coverage_on_recorded_nse_filings() -> None:
         if classify(r["desc"], r["desc"], body) is not None:
             classified += 1
     assert classified / len(rows) >= 0.9
+
+
+@pytest.mark.parametrize(
+    ("body", "category", "stage"),
+    [
+        (
+            "X Limited has informed the Exchange regarding a press release dated "
+            'November 06, 2026, titled "Tata Steel reports Consolidated EBITDA of Rs 10,665 '
+            'crores for the quarter".',
+            "results",
+            "press_release",
+        ),
+        (
+            'titled "Denta Water Reports Q2 FY27 Performance; Order Book Stands at 7,824 Million"',
+            "results",
+            "press_release",
+        ),
+        ('titled  Achieve 19% PAT Growth in H1-FY27 ".', "results", "press_release"),
+        (
+            'titled "Tata Power Renewables Records over 130% YoY Growth in Utility-Scale '
+            'Execution in Q2 FY27"',
+            "press_release",
+            None,
+        ),
+        (
+            'titled "Tata Power Signs MoU with BPCL to Develop 110 kV Power Infrastructure"',
+            "press_release",
+            None,
+        ),
+    ],
+)
+def test_a_press_release_title_can_be_more_specific(
+    body: str, category: str, stage: str | None
+) -> None:
+    c = classify("Press Release", "Press Release", body)
+    assert c is not None
+    assert c.category == category
+    assert c.attributes.get("stage") == stage
+
+
+def test_internal_restructuring_is_marked() -> None:
+    c = classify(
+        "Scheme of Arrangement",
+        "Scheme of Arrangement",
+        "Effective Date of the Scheme of Amalgamation amongst Tata Steel Limited and Rujuvalika "
+        "Investments Limited, wholly owned subsidiary",
+    )
+    assert c is not None and c.category == "M&A" and c.attributes.get("kind") == "internal"

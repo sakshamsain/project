@@ -18,7 +18,16 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from finn.push.headline import headline_for
-from finn.push.score import Breakdown, EventFeatures, absolute_tier, base_weight, score
+from finn.push.score import (
+    ALPHA,
+    BETA,
+    GAMMA,
+    Breakdown,
+    EventFeatures,
+    absolute_tier,
+    base_weight,
+    score,
+)
 
 DAY = timedelta(days=1)
 
@@ -159,6 +168,7 @@ def build(draft: EventDraft, prior_first_seen: Sequence[datetime] = ()) -> Event
     family; one inside the lookback makes this event less novel.
     """
     rep = draft.representative
+    lead = _headline_source(draft, rep)
     start = draft.first_seen_at
     is_first = not any(start - NOVELTY_LOOKBACK <= t < start for t in prior_first_seen)
     reaction = draft.reaction or {}
@@ -182,16 +192,33 @@ def build(draft: EventDraft, prior_first_seen: Sequence[datetime] = ()) -> Event
         first_seen_at=start,
         last_filed_at=draft.last_filed_at,
         filing_count=len(draft.members),
-        headline=headline_for(rep.subject, rep.text, rep.summary),
+        headline=headline_for(lead.subject, lead.text, lead.summary),
         score=b.score,
         tier=absolute_tier(b),
         breakdown={
             **asdict(b),
+            # What each term added, so the app can explain a score without redoing it.
+            "contributions": {
+                "category": round(b.user_weight * b.base, 4),
+                "size": round(ALPHA * b.size, 4),
+                "reaction": round(BETA * b.reaction, 4),
+                "novelty": round(GAMMA * b.novelty, 4),
+            },
             "representative": rep.key,
             "is_first_filing": is_first,
             "is_restatement": features.is_restatement,
         },
     )
+
+
+def _headline_source(draft: EventDraft, rep: FilingFacts) -> FilingFacts:
+    """Results events take their headline from the company's own release when there is
+    one: it leads with the numbers, where the filing's description only names the period."""
+    if draft.family == "results":
+        for m in sorted(draft.members, key=lambda x: x.filed_at):
+            if m.attributes.get("stage") == "press_release":
+                return m
+    return rep
 
 
 def _opt_float(v: Any) -> float | None:

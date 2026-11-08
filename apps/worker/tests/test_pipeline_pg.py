@@ -176,3 +176,28 @@ def test_session_window_puts_saturday_filings_on_monday() -> None:
     saturday_filing = datetime(2026, 11, 7, 18, 40, tzinfo=IST)
     assert start < saturday_filing <= end
     assert end - start == timedelta(days=3)
+
+
+def test_rebuild_reproduces_live_clustering(clean_db: str) -> None:
+    from finn.push.rebuild import detach_all, filing_days, reclassify, recluster_day
+
+    _seed(clean_db)
+    rows = _rows("announcements_TATAPOWER_30d.json") + _rows("announcements_market_1d_sample.json")
+    with connect(clean_db) as conn:
+        ingest_announcements(conn, rows)
+        live = fetch_all(
+            conn, "select cluster_key, filing_count, score from events order by cluster_key"
+        )
+    with connect(clean_db) as conn:
+        assert reclassify(conn) == 0  # same rules, nothing to change
+        assert detach_all(conn) == len(live)
+        for d in filing_days(conn):
+            recluster_day(conn, d)
+        rebuilt = fetch_all(
+            conn, "select cluster_key, filing_count, score from events order by cluster_key"
+        )
+        unlinked = fetch_all(conn, "select count(*) as n from filings where event_id is null")
+    assert [(r["cluster_key"], r["filing_count"]) for r in rebuilt] == [
+        (r["cluster_key"], r["filing_count"]) for r in live
+    ]
+    assert unlinked[0]["n"] == 0

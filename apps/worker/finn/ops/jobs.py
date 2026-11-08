@@ -22,7 +22,7 @@ from typing import Any, Protocol
 from finn.core.db import Conn, connect, fetch_all
 from finn.ops.seed import seed_companies, seed_demo_profile
 from finn.push import eod
-from finn.push.pipeline import ingest_announcements
+from finn.push.pipeline import ingest_announcements, rescore_recent
 from finn.sources.nse import (
     IST,
     parse_board_meetings,
@@ -201,3 +201,53 @@ def run_backfill(
             eod.link_and_react(conn, eod.detect_anomalies(conn, d))
         summary["sessions"] += 1
     return summary
+
+
+def run_rescan(url: str, sessions: int = 40, end: date | None = None) -> dict[str, Any]:
+    """Recompute anomalies, links and reactions for the last `sessions` stored sessions,
+    after a change to the rules or the floors."""
+    with _step(url) as conn:
+        days = [
+            r["trade_date"]
+            for r in fetch_all(
+                conn,
+                "select distinct trade_date from eod_prices where trade_date <= %s"
+                " order by trade_date desc limit %s",
+                [end or now_ist().date(), sessions],
+            )
+        ]
+    with _step(url) as conn:
+        rescored_all = rescore_recent(conn, days=max(60, sessions * 2))
+    totals = {"sessions": 0, "anomalies": 0, "linked": 0, "events_rescored": rescored_all}
+    for d in sorted(days):
+        with _step(url) as conn:
+            r = eod.link_and_react(conn, eod.detect_anomalies(conn, d))
+        totals["sessions"] += 1
+        totals["anomalies"] += r.anomalies
+        totals["linked"] += r.linked
+        totals["events_rescored"] += r.events_rescored
+    return totals
+
+
+def run_rebuild(url: str, rescan_sessions: int = 45) -> dict[str, Any]:
+    """Re-read every filing with the current rules, rebuild events, then restore anomaly
+    links and reactions. Safe to run while polls are paused by the advisory lock."""
+    from finn.push.rebuild import detach_all, filing_days, reclassify, recluster_day
+
+    with _step(url) as conn:
+        changed = reclassify(conn)
+    with _step(url) as conn:
+        dropped = detach_all(conn)
+        days = filing_days(conn)
+    events = 0
+    for d in days:
+        with _step(url) as conn:
+            events += recluster_day(conn, d)
+    rescan = run_rescan(url, rescan_sessions)
+    return {
+        "reclassified": changed,
+        "events_dropped": dropped,
+        "days": len(days),
+        "events_written": events,
+        "rescan": rescan,
+    }

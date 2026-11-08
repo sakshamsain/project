@@ -122,6 +122,22 @@ def backfill(filing_days: int = 60, price_days: int = 90) -> dict[str, Any]:
     )
 
 
+@app.function(image=image, secrets=secrets, timeout=3600)
+def rescan(sessions: int = 40) -> dict[str, Any]:
+    """Recompute anomalies and reactions after a rules change."""
+    from finn.ops.jobs import run_rescan
+
+    return _log("rescan", run_rescan(_setup(), sessions))
+
+
+@app.function(image=image, secrets=secrets, timeout=3 * 3600)
+def rebuild(rescan_sessions: int = 45) -> dict[str, Any]:
+    """Replay stored filings through the current rules and clustering."""
+    from finn.ops.jobs import run_rebuild
+
+    return _log("rebuild", run_rebuild(_setup(), rescan_sessions))
+
+
 @app.function(image=image, secrets=secrets, timeout=120)
 def env_check() -> dict[str, Any]:
     """Which expected settings are present (names only, never values)."""

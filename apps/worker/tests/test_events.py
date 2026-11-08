@@ -123,3 +123,32 @@ def test_restatement_loses_novelty() -> None:
 
 def _asdict(x: FilingFacts) -> dict[str, object]:
     return {k: getattr(x, k) for k in FilingFacts.__slots__}
+
+
+def test_contributions_add_up_to_the_score_without_a_floor() -> None:
+    d = assign([f("lit", "litigation", 0)], [])[0]
+    d.reaction = {"abnormal_return_pct": -3.0, "volume_z": 1.0}
+    row = build(d)
+    c = row.breakdown["contributions"]
+    assert row.breakdown["floor_applied"] is False
+    assert abs(sum(c.values()) - row.score) < 1e-3
+
+
+def test_results_event_takes_the_release_title_as_headline() -> None:
+    filing = f("res", "results", 0, stage="filing")
+    release = FilingFacts(
+        key="pr",
+        isin="INE245A01021",
+        filed_at=T0 + timedelta(minutes=20),
+        subject="Press Release",
+        text="X has informed the Exchange regarding a press release dated November 06, 2026, "
+        'titled "Tata Steel reports Consolidated EBITDA of Rs 10,665 crores for the quarter".',
+        summary=None,
+        category="results",
+        attributes={"stage": "press_release"},
+    )
+    d = assign([filing, release], [])
+    assert len(d) == 1
+    row = build(d[0])
+    assert row.headline.startswith("Tata Steel reports Consolidated EBITDA")
+    assert row.breakdown["representative"] == "res"

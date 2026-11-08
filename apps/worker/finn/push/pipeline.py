@@ -360,6 +360,19 @@ def rescore_events(conn: Conn, event_ids: Iterable[int]) -> int:
     return len(write_events(conn, _with_members(conn, heads)))
 
 
+def rescore_recent(conn: Conn, days: int = 60, batch: int = 500) -> int:
+    """Rescore every event first seen in the last `days` (after a scoring change)."""
+    ids = [
+        int(r["id"])
+        for r in fetch_all(
+            conn,
+            "select id from events where first_seen_at >= now() - make_interval(days => %s)",
+            [days],
+        )
+    ]
+    return sum(rescore_events(conn, ids[i : i + batch]) for i in range(0, len(ids), batch))
+
+
 def session_bounds(prev_trade_date: date, trade_date: date) -> tuple[datetime, datetime]:
     """Filings after the previous close and up to this close move this session's price."""
     from finn.sources.nse import IST
