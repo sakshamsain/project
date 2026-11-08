@@ -541,6 +541,18 @@ class NseClient:
         r = self._get(False, url)
         return None if r is None else str(r.text)
 
+    def fetch_bytes(self, url: str, max_bytes: int = 30_000_000) -> bytes | None:
+        """A filing attachment (PDF) from NSE's archives; None when it is not there."""
+        if not url.startswith(ARCHIVES + "/"):
+            raise NseError(f"refusing to fetch outside NSE archives: {url}")
+        r = self._get(False, url)
+        if r is None:
+            return None
+        data = bytes(r.content)
+        if len(data) > max_bytes:
+            raise NseError(f"{url}: {len(data)} bytes is over the {max_bytes} limit")
+        return data
+
     def index_closes(self, day: date) -> str | None:
         r = self._get(False, f"{ARCHIVES}/content/indices/ind_close_all_{day:%d%m%Y}.csv")
         return None if r is None else str(r.text)

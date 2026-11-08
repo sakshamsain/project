@@ -18,8 +18,7 @@ ingest = [
   "lxml>=5.0",
   "selectolax>=0.3",
 ]
-docs = ["pymupdf>=1.24", "pdfplumber>=0.11", "fastembed>=0.3"]
-llm = ["litellm>=1.40"]
+docs = ["pymupdf>=1.24"]
 db = ["psycopg[binary]>=3.2", "pgvector>=0.3"]
 deploy = ["modal>=0.64"]
 push = [

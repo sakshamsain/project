@@ -29,6 +29,7 @@ image = (
         "pyyaml>=6.0",
         "sentry-sdk>=2.0",
         "pywebpush>=2.0",
+        "pymupdf>=1.24",
     )
     # rules.yaml and models.yaml ship with the code; the default filter keeps only .py files.
     .add_local_python_source("finn", ignore=["**/__pycache__", "**/*.pyc"])
@@ -145,6 +146,15 @@ def results(days: int = 30, limit: int = 40, force: bool = False) -> dict[str, A
     from finn.ops.jobs import run_results
 
     return _log("results", run_results(_setup(), _client(), days=days, limit=limit, force=force))
+
+
+@app.function(image=image, secrets=secrets, timeout=3600)
+def people(days: int = 30, limit: int = 30) -> dict[str, Any]:
+    """People cards for board and management changes on held companies."""
+    from finn.ops.jobs import make_llm, run_people
+
+    url = _setup()
+    return _log("people", run_people(url, _client(), make_llm(url), days=days, limit=limit))
 
 
 @app.function(image=image, secrets=secrets, timeout=120)

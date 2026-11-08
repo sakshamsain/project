@@ -110,6 +110,7 @@ def run_poll(url: str, nse: Nse, at: datetime | None = None) -> dict[str, Any]:
             out[d.isoformat()] = ingest_announcements(conn, rows).as_dict()
     if hasattr(nse, "integrated_filings"):
         out["results"] = run_results(url, nse, days=10, limit=4)
+        out["people"] = run_people(url, nse, make_llm(url), days=10, limit=3)
     out["notify"] = run_notify(url, at)
     return out
 
@@ -315,3 +316,58 @@ def run_notify(
     with _step(url) as conn:
         sent = send_pending(conn, key, subject)
     return {"queued": queued, "released": released, **sent}
+
+
+def make_llm(url: str) -> Any:
+    import os
+
+    from finn.llm.client import DbStore, Llm
+
+    return Llm(os.environ.get("GEMINI_API_KEY"), os.environ.get("GROQ_API_KEY"), DbStore(url))
+
+
+def run_people(url: str, nse: Any, llm: Any, days: int = 30, limit: int = 6) -> dict[str, Any]:
+    """People cards for board and management changes on held companies."""
+    from finn.core.db import Jsonb
+    from finn.push.people import (
+        card_json,
+        event_attachments,
+        extract_people,
+        merge_cards,
+        pending_people_events,
+    )
+    from finn.push.results import due
+    from finn.sources.pdf import pdf_text
+
+    now = now_ist()
+    with _step(url) as conn:
+        todo = [e for e in pending_people_events(conn, days, limit) if due(e["attempted_at"], now)]
+        urls = {int(e["id"]): event_attachments(conn, int(e["id"])) for e in todo}
+    statuses: dict[str, int] = {}
+    for e in todo:
+        cards: list[dict[str, Any]] = []
+        status = "empty"
+        try:
+            for u in urls[int(e["id"])]:
+                data = nse.fetch_bytes(u)
+                if data is None:
+                    continue
+                text = pdf_text(data)
+                if text.scanned:
+                    status = "scanned"
+                    continue
+                cards.append(card_json(extract_people(llm, text.pages, str(e["company"])), u))
+            card = merge_cards(cards) if cards else {"status": status, "people": []}
+        except Exception as exc:  # one bad filing must not stop the rest
+            card = {"status": "error", "reason": f"{type(exc).__name__}: {exc}"[:300]}
+        card["attempted_at"] = now.isoformat()
+        with _step(url) as conn:
+            fetch_all(
+                conn,
+                "update events set enrichment = jsonb_set(enrichment, '{people_card}', %s)"
+                " where id = %s",
+                [Jsonb(card), int(e["id"])],
+            )
+        st = str(card["status"])
+        statuses[st] = statuses.get(st, 0) + 1
+    return {"tried": len(todo), "statuses": statuses}
