@@ -1,16 +1,19 @@
-# Rules-first filing classifier, v0.
+# Rules-first filing classifier, v1: calibrated on real NSE subject lines (8 Nov 2026
+# samples in fixtures/nse/). Two passes: rules are tried on the exchange subject first;
+# when the subject is generic ("General Updates", "Outcome of Board Meeting") or matches
+# nothing, they are tried on the filing's own text. No match sends it to the small model.
 #
-# Written before seeing real filings. On the first build day, pull 30 days of
-# portfolio filings, count subject strings, and tune these against that sample.
-#
-# Order matters: the first matching rule wins. `any` holds case-insensitive regexes
-# matched against "subject + exchange category + the first 600 characters of text".
-# A filing that matches nothing goes to the small model.
+# Order matters: the first matching rule wins. `any` holds case-insensitive regexes.
 
 - id: trading_window
   category: unclassified
   attributes: {kind: trading_window}
   any: ['trading window']
+
+- id: non_equity
+  category: unclassified
+  attributes: {kind: non_equity}
+  any: ['declaration of nav', 'redemption/payment of interest', 'interest payment']
 
 - id: auditor_resignation
   category: management_change
@@ -23,6 +26,7 @@
   category: results
   attributes: {stage: intimation}
   any:
+    - 'board meeting intimation'
     - 'intimation of (the )?board meeting'
     - 'notice of (the )?board meeting'
     - 'board meeting (is )?(scheduled|to be held)'
@@ -31,7 +35,7 @@
 - id: results_newspaper
   category: results
   attributes: {stage: newspaper_ad}
-  any: ['newspaper (publication|advertisement|ad)s?.{0,80}results']
+  any: ['newspaper (publication|advertisement|ad)s?.{0,100}(results|quarter|half year)']
 
 - id: transcript
   category: earnings_call
@@ -41,7 +45,7 @@
 - id: call_recording
   category: earnings_call
   attributes: {stage: recording}
-  any: ['audio recording', 'video recording', 'recording of the (earnings|conference) call']
+  any: ['audio recording', 'video recording', 'recording of the (earnings|conference) call', 'audio/video']
 
 - id: call_notice
   category: earnings_call
@@ -49,23 +53,31 @@
   any:
     - '(earnings|conference) call (on|with|to discuss|scheduled)'
     - 'intimation of (earnings|conference) call'
+    - 'earnings call'
 
 - id: investor_meet
   category: investor_meetings
   any:
-    - 'analysts?\s*/\s*institutional investor meet'
+    - 'schedule of (analyst|investor|meet)'
+    - 'analysts? or institutional investors? meet'
     - 'investor meet'
     - 'one[- ]on[- ]one meeting'
     - 'investor conference'
-    - 'schedule of (analyst|investor)'
+    - 'analyst\(s\)\s*/\s*investor\(s\) meet'
+    - 'analysts?\s*/\s*institutional investor meet'
+
+- id: results_presentation
+  category: results
+  attributes: {stage: presentation}
+  any: ['investor presentation', 'earnings presentation', 'results presentation', 'shareholders?.? letter']
 
 - id: results_filing
   category: results
   attributes: {stage: filing}
   any:
+    - 'integrated filing.{0,20}financial'
     - 'financial results? for the (quarter|half[- ]year|year|period|nine months)'
     - '(un)?audited (standalone|consolidated)?\s*(and (standalone|consolidated)\s*)?financial results'
-    - 'integrated filing.{0,20}financial'
     - 'financial result updates'
 
 - id: credit_rating
@@ -79,21 +91,26 @@
   category: management_change
   any:
     - 'change in (directors?|key managerial personnel|kmp|management|senior management)'
+    - '^appointment\b'
+    - '^resignation\b'
+    - '^cessation\b'
+    - 'resignation of director'
     - 'appointment of (mr\.?|ms\.?|mrs\.?|dr\.? )?.{0,60}(chief|managing director|whole[- ]time|executive director|independent director|additional director|company secretary|compliance officer)'
     - 'resignation of (mr\.?|ms\.?|mrs\.?|dr\.? )?.{0,60}(chief|managing director|director|cfo|ceo|company secretary|compliance officer)'
-    - 'cessation of'
     - 're-?appointment of'
 
 - id: pledge
   category: pledging
-  any: ['encumbrance', '\bpledge', 'regulation 31\s*\(1\)']
+  any: ['encumbrance', '\bpledge', 'regulation 31\s*\(1\)', 'reg\.? 31']
 
 - id: insider
   category: insider_trading
   any:
+    - 'insider trading'
     - 'regulation 7\s*\(2\)'
-    - 'prohibition of insider trading'
     - 'regulation 29\s*\(\d\)'
+    - 'reg\.? 29'
+    - '\bsast\b'
     - 'substantial acquisition'
 
 - id: buyback
@@ -104,7 +121,12 @@
 - id: esop_allotment
   category: unclassified
   attributes: {kind: esop}
-  any: ['\besop\b', '\besos\b', 'employee stock option', 'employees? stock (purchase|option)']
+  any: ['\besop\b', '\besos\b', '\besps\b', 'employee stock option', 'employees? stock (purchase|option)']
+
+- id: fund_use
+  category: unclassified
+  attributes: {kind: fund_use}
+  any: ['monitoring agency', 'statement of deviation']
 
 - id: fund_raise
   category: fund_raise
@@ -156,16 +178,33 @@
     - 'litigation'
     - 'show cause notice'
     - '\bpenalty\b'
-    - 'order (passed|received) (by|from)'
+    - 'orders? passed'
+    - 'actions? (initiated|taken)'
     - 'insolvency'
     - '\bnclt\b'
     - 'tax demand'
     - 'warning letter'
     - 'search and seizure'
+    - '\bcourt\b'
+    - 'arbitra'
+    - 'tribunal'
+
+- id: disruption
+  category: press_release
+  attributes: {kind: disruption}
+  any: ['disruption of operations', '\bfire\b', '\bstrike\b', 'shut ?down']
+
+- id: order_win
+  category: press_release
+  attributes: {kind: order_win}
+  any:
+    - 'bagging/receiving of orders'
+    - '(bags?|wins?|received|secures?) (an? )?(new )?(orders?|contracts?)'
+    - 'order (win|inflow)'
 
 - id: agm_egm
   category: agm_egm
-  any: ['annual general meeting', '\bagm\b', 'extra-?ordinary general meeting', '\begm\b']
+  any: ['annual general meeting', '\bagm\b', 'extra-?ordinary general meeting', '\begm\b', 'shareholders meeting']
 
 - id: postal_ballot
   category: postal_ballot
@@ -183,6 +222,9 @@
     - 'closure of (the )?register'
     - 'registrar and (share )?transfer agent'
     - 'newspaper (publication|advertisement)'
+    - 'shareholding pattern'
+    - 'record date'
+    - 'registered office'
 
 - id: press_release
   category: press_release
@@ -190,8 +232,6 @@
   any:
     - 'press release'
     - 'media release'
-    - '(bags?|wins?|received|secures?) (an? )?(new )?orders?'
-    - 'order (win|inflow)'
     - 'launch'
     - 'partnership'
     - 'clarification'
