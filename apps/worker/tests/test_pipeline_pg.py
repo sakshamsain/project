@@ -201,3 +201,66 @@ def test_rebuild_reproduces_live_clustering(clean_db: str) -> None:
         (r["cluster_key"], r["filing_count"]) for r in live
     ]
     assert unlinked[0]["n"] == 0
+
+
+def test_front_page_event_notifies_once(clean_db: str, monkeypatch: object) -> None:
+    import pywebpush
+
+    from finn.push import notify
+
+    sent: list[dict[str, object]] = []
+
+    def fake_webpush(**kwargs: object) -> None:
+        sent.append(kwargs)
+
+    monkeypatch.setattr(pywebpush, "webpush", fake_webpush)  # type: ignore[attr-defined]
+    _seed(clean_db)
+    rows = _rows("announcements_TATAPOWER_30d.json")
+    with connect(clean_db) as conn:
+        ingest_announcements(conn, rows)
+        fetch_all(
+            conn,
+            "insert into push_subscriptions (profile_id, endpoint, p256dh, auth)"
+            " values (%s, 'https://fcm.googleapis.com/fcm/send/x', 'k', 'a')",
+            [DEMO_PROFILE_ID],
+        )
+        fetch_all(
+            conn,
+            "update events set tier = 'front' where headline like %s",
+            ["%Singapore Court%"],
+        )
+    now = datetime(2026, 11, 7, 20, 0, tzinfo=IST)
+    with connect(clean_db) as conn:
+        assert notify.queue_event_notifications(conn, now) == 1
+        assert notify.queue_event_notifications(conn, now) == 0  # deduped
+        result = notify.send_pending(conn, "unused-key", "mailto:test@example.com")
+    assert result == {"sent": 1, "failed": 0, "gone": 0}
+    payload = json.loads(str(sent[0]["data"]))
+    assert payload["title"] == "TATAPOWER: Legal or regulatory"
+    assert payload["url"].startswith("/event/")
+
+
+def test_quiet_hours_hold_then_release(clean_db: str) -> None:
+    from finn.push import notify
+
+    _seed(clean_db)
+    with connect(clean_db) as conn:
+        ingest_announcements(conn, _rows("announcements_TATAPOWER_30d.json"))
+        fetch_all(
+            conn,
+            "insert into push_subscriptions (profile_id, endpoint, p256dh, auth)"
+            " values (%s, 'https://fcm.googleapis.com/fcm/send/y', 'k', 'a')",
+            [DEMO_PROFILE_ID],
+        )
+        fetch_all(
+            conn,
+            "update events set tier = 'front', first_seen_at = %s where headline like %s",
+            [datetime(2026, 11, 7, 22, 30, tzinfo=IST), "%Singapore%"],
+        )
+        night = datetime(2026, 11, 7, 23, 0, tzinfo=IST)
+        assert notify.queue_event_notifications(conn, night) == 1
+        assert notify.release_held(conn, night) == 0
+        morning = datetime(2026, 11, 8, 7, 5, tzinfo=IST)
+        assert notify.release_held(conn, morning) == 1
+        status = fetch_all(conn, "select status from notifications")
+    assert [r["status"] for r in status] == ["queued"]

@@ -54,3 +54,23 @@ Three lines a day: what was asked, what went wrong, what changed.
   all 2,632 listed equities. Web app live on Vercel: Today (three tiers, window picker,
   results dates), Pulse, company and event pages, portfolio editor, alert limits,
   notification opt-in. 144 worker tests, including database tests on Postgres.
+
+## Sun 8 Nov 2026 (Day 0, late afternoon): results cards and push; paused for the usage limit
+
+- **Changed:** found NSE's Integrated Filing endpoint (`/api/integrated-filing-results`) and
+  read each company's own results XBRL: the card compares the reported quarter with the
+  previous one and the year-ago one, each from its own filing, all maths in
+  `results_math`. Banks and NBFCs show NII and PPOP. 11 of 11 recent results on the demo
+  portfolio have cards; results headlines now lead with computed numbers when the
+  company's release title has none. Replayed all 32.6k filings through the new rules.
+  Web push: subscriptions on the web, sending from the worker (one per front-page event,
+  one EOD summary, quiet hours 22:00 to 07:00 IST). 166 worker tests.
+- **Went wrong:** the first job run after a Modal deploy was served by a container still
+  on the old code; re-ran it. A release whose NSE summary mentioned "investor
+  presentation" was filed as a presentation; the summary now decides only when nothing
+  else matched.
+- **Next:** (1) "Send a test notification" button on Settings; (2) management-change card
+  from the appointment filing's own profile text, with verified quotes; (3) the Dossier:
+  transcripts and annual reports into `documents`/`doc_pages`, guidance extraction, the
+  Promise Ledger against the quarterly figures now stored in `financials`; (4) evals and
+  the covering note.

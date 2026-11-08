@@ -22,6 +22,9 @@ docs = ["pymupdf>=1.24", "pdfplumber>=0.11", "fastembed>=0.3"]
 llm = ["litellm>=1.40"]
 db = ["psycopg[binary]>=3.2", "pgvector>=0.3"]
 deploy = ["modal>=0.64"]
+push = [
+    "pywebpush>=2.0",
+]
 
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10", "types-PyYAML", "modal>=1.6"]
@@ -50,5 +53,5 @@ packages = ["finn"]
 
 [[tool.mypy.overrides]]
 # Third-party packages that ship without type information.
-module = ["yfinance.*", "nse.*", "bse.*", "selectolax.*", "fitz.*", "pdfplumber.*", "fastembed.*", "litellm.*", "sentry_sdk.*"]
+module = ["yfinance.*", "nse.*", "bse.*", "selectolax.*", "fitz.*", "pdfplumber.*", "fastembed.*", "litellm.*", "sentry_sdk.*", "pywebpush.*"]
 ignore_missing_imports = true

@@ -28,6 +28,7 @@ image = (
         "pydantic>=2.7",
         "pyyaml>=6.0",
         "sentry-sdk>=2.0",
+        "pywebpush>=2.0",
     )
     # rules.yaml and models.yaml ship with the code; the default filter keeps only .py files.
     .add_local_python_source("finn", ignore=["**/__pycache__", "**/*.pyc"])

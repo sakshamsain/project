@@ -110,6 +110,7 @@ def run_poll(url: str, nse: Nse, at: datetime | None = None) -> dict[str, Any]:
             out[d.isoformat()] = ingest_announcements(conn, rows).as_dict()
     if hasattr(nse, "integrated_filings"):
         out["results"] = run_results(url, nse, days=10, limit=4)
+    out["notify"] = run_notify(url, at)
     return out
 
 
@@ -149,7 +150,7 @@ def run_eod(url: str, nse: Nse, day: date | None = None, force: bool = False) ->
     with _step(url) as conn:
         report = eod.link_and_react(conn, eod.detect_anomalies(conn, d))
     record_health(url, "eod_done", True)
-    return {"bars": stored, **report.as_dict()}
+    return {"bars": stored, **report.as_dict(), "notify": run_notify(url, trade_date=d)}
 
 
 def run_backfill(
@@ -287,3 +288,30 @@ def run_results(
             store_card(conn, str(e["isin"]), int(e["id"]), card)
         statuses[card["status"]] = statuses.get(card["status"], 0) + 1
     return {"tried": len(todo), "statuses": statuses}
+
+
+def run_notify(
+    url: str, now: datetime | None = None, trade_date: date | None = None
+) -> dict[str, Any]:
+    """Queue and send web push: front-page events, and the EOD summary when given a date."""
+    import os
+
+    from finn.push.notify import (
+        queue_eod_notifications,
+        queue_event_notifications,
+        release_held,
+        send_pending,
+    )
+
+    key, subject = os.environ.get("VAPID_PRIVATE_KEY"), os.environ.get("VAPID_SUBJECT")
+    if not key or not subject:
+        return {"skipped": "VAPID keys not set"}
+    now = now or now_ist()
+    with _step(url) as conn:
+        queued = queue_event_notifications(conn, now)
+        if trade_date is not None:
+            queued += queue_eod_notifications(conn, trade_date, now)
+        released = release_held(conn, now)
+    with _step(url) as conn:
+        sent = send_pending(conn, key, subject)
+    return {"queued": queued, "released": released, **sent}
