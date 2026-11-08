@@ -17,7 +17,7 @@ a Promise Ledger of guidance against delivery). The full plan lives in the
 
 ```bash
 cd apps/worker
-uv sync --group dev
+uv sync --group dev --extra ingest
 uv run pytest -q
 uv run ruff check . && uv run ruff format --check .
 uv run mypy

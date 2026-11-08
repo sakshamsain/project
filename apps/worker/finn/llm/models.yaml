@@ -1,29 +1,46 @@
 # Model routing by tier. Code refers to tiers only; exact model IDs live here.
 #
-# IDs below were listed as free-tier on Google's pricing page and Groq's free-plan
-# limits on 8 Nov 2026. Re-check on Day 0 once the APIs are reachable:
-#   Gemini: GET https://generativelanguage.googleapis.com/v1beta/models
-#   Groq:   GET https://api.groq.com/openai/v1/models
+# Pinned on 8 Nov 2026 from live calls with this project's free-tier keys:
+#   gemini-3.1-flash-lite   answered in 0.8 s
+#   gemini-3.5-flash-lite   answered in 0.8 s
+#   gemini-3.5-flash        answered in 2.8 s
+#   gemini-3.6-flash        answered in 3.1 s
+#   gemini-3.7-flash, gemini-3.8-flash   503 "high demand" on repeated tries: candidates only
+#   gemini-4-argon          free-tier quota is zero (paid only)
+#   groq openai/gpt-oss-20b answered
+# Reliability beats recency: a model that is overloaded during review is worse than an
+# older one that answers.
+#
+# Both Gemini Flash and gpt-oss models spend output tokens on reasoning. Keep reasoning
+# low for extraction and leave headroom in max output tokens, or the answer comes back empty.
 
 tiers:
   t1_small:        # ambiguous classification, one-liners, bio wording, alert-rule parsing
-    primary: {provider: groq, model: openai/gpt-oss-20b}
+    primary: {provider: groq, model: openai/gpt-oss-20b, reasoning: low}
     fallback:
       - {provider: gemini, model: gemini-3.1-flash-lite}
   t2_reader:       # whole transcripts, results PDFs, annual-report sections, scanned pages
-    primary: {provider: gemini, model: gemini-3.1-flash-lite}
-    escalate: {provider: gemini, model: gemini-3.5-flash}   # failed validation or low confidence
+    primary: {provider: gemini, model: gemini-3.5-flash-lite, reasoning: low}
+    escalate: {provider: gemini, model: gemini-3.6-flash}   # failed validation or low confidence
     fallback:
+      - {provider: gemini, model: gemini-3.1-flash-lite}
       - {provider: groq, model: openai/gpt-oss-120b}         # chunked: 8K tokens/min on free plan
   t3_strong:       # bull vs bear, ledger summary, hard Ask answers
-    primary: {provider: gemini, model: gemini-3.5-flash}
+    primary: {provider: gemini, model: gemini-3.6-flash}
     fallback:
+      - {provider: gemini, model: gemini-3.5-flash}
       - {provider: groq, model: openai/gpt-oss-120b}
 
+candidates:        # re-test before promoting; overloaded on 8 Nov 2026
+  - gemini-3.8-flash
+  - gemini-3.7-flash
+
 # Paid list prices (USD per million tokens) for the shadow-cost ledger.
-# Gemini figures from Google's pricing page, 8 Nov 2026. Fill Groq's on Day 0.
+# Filled only from Google's pricing page (8 Nov 2026); null means not yet verified.
 paid_list_prices:
   gemini-3.1-flash-lite: {input: 0.25, output: 1.50}
   gemini-3.5-flash: {input: 1.50, output: 9.00}
+  gemini-3.5-flash-lite: {input: null, output: null}
+  gemini-3.6-flash: {input: null, output: null}
   openai/gpt-oss-20b: {input: null, output: null}
   openai/gpt-oss-120b: {input: null, output: null}

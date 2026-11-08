@@ -40,3 +40,20 @@ text only, which keeps the database well inside the free plan's 1 GB.
 ## 008 · ISIN as the canonical key
 NSE symbols change (renames, demergers); ISIN does not. Symbols, BSE codes, Yahoo
 tickers and Screener slugs are aliases with validity dates.
+
+## 009 · NSE first, BSE later
+The Day-0 spike from Modal reached NSE's RSS feeds, its announcements API, the bhavcopy
+and delivery files, Screener and Yahoo. BSE's API answered 403, matching the `bse`
+client's warning that BSE is changing endpoints. Ingestion builds on NSE; BSE returns as
+a second source only once a working endpoint is confirmed.
+
+## 010 · Pin models that answer, not the newest
+On 8 Nov the newest free Flash models (3.7, 3.8) returned 503 "high demand" while
+3.5 Flash-Lite and 3.6 Flash answered in under 4 s. A demo that fails under load is
+worse than an older model, so tiers pin the reliable ones and list newer ones as
+candidates to re-test.
+
+## 011 · Migrations over Neon's HTTPS endpoint
+`finn.core.migrate` applies each file once inside a transaction, records a checksum and
+refuses edited files. It talks to Neon over HTTPS, so it works where raw TCP to Postgres
+is blocked; CI applies the same files with psql against pgvector.

@@ -24,7 +24,7 @@ db = ["psycopg[binary]>=3.2", "pgvector>=0.3"]
 deploy = ["modal>=0.64"]
 
 [dependency-groups]
-dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10", "types-PyYAML"]
+dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10", "types-PyYAML", "modal>=1.6"]
 
 [build-system]
 requires = ["hatchling"]
@@ -47,3 +47,8 @@ testpaths = ["tests"]
 python_version = "3.12"
 strict = true
 packages = ["finn"]
+
+[[tool.mypy.overrides]]
+# Third-party packages that ship without type information.
+module = ["yfinance.*", "nse.*", "bse.*", "selectolax.*", "fitz.*", "pdfplumber.*", "fastembed.*", "litellm.*"]
+ignore_missing_imports = true

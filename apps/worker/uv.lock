@@ -842,6 +842,7 @@ llm = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "modal" },
     { name = "mypy" },
     { name = "pytest" },
     { name = "ruff" },
@@ -871,6 +872,7 @@ provides-extras = ["ingest", "docs", "llm", "db", "deploy"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "modal", specifier = ">=1.6" },
     { name = "mypy", specifier = ">=1.10" },
     { name = "pytest", specifier = ">=8" },
     { name = "ruff", specifier = ">=0.6" },
