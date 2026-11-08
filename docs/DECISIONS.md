@@ -101,3 +101,18 @@ The app records a request as a `jobs` row and pings a token-protected Modal endp
 which starts the build at once; the 5-minute poll claims anything the ping missed (FOR
 UPDATE SKIP LOCKED). Progress is written to the row and shown on the page. Ten new
 ledgers per device per day; built ledgers are open to everyone.
+
+## 019 · Accounts are optional and live in our own database
+Better Auth (email and password) runs inside the Next.js app; users and sessions sit in
+Postgres (migration 0006), so there is no outside identity service to configure. A
+device without an account keeps an anonymous portfolio; signing up moves it into the
+account, which then follows the user to any device; a profile that belongs to an account
+is never shown to a signed-out visitor on the same device. Not yet: email verification
+and password reset, which need an email sender.
+
+## 020 · Charts are hand-built SVG and interactive by default
+One measure per chart: price, with volume in its own strip; revenue (or NII) and net
+profit as two charts, never a second axis. Every chart has a crosshair or per-mark
+tooltip, keyboard reading and a table view; filings sit on the price line and open on
+tap. The chart colour was run through the dataviz palette checks for both surfaces;
+dark mode uses its own darker violet step because the lighter one failed the band.

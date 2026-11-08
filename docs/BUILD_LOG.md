@@ -96,3 +96,22 @@ Three lines a day: what was asked, what went wrong, what changed.
 - **Next:** delivery statements from later calls for promises the filings cannot measure
   (AUM, order inflow); evals (classification, quote survival, ledger precision on a
   hand-checked set); the covering note.
+
+## Sun 8 Nov 2026 (Day 0, late night): charts, accounts, interface
+
+- **Asked:** "the graphs should be interactive, and authentication, and a user friendly
+  interface."
+- **Changed:** price charts with ranges (1M to 1Y), crosshair, tooltip, filings marked on
+  the line, a separate volume strip, keyboard reading and a table view; quarterly bar
+  charts of revenue (or NII) and net profit with QoQ and YoY on tap; a band-and-dot chart
+  for each checked promise. Accounts (email and password) with sessions in Postgres; the
+  device's portfolio moves into the account at sign-up. Search from every page, an
+  account menu, a first-visit guide, loading and error screens, and a Today window that
+  widens on quiet days. A year of prices and up to ten quarters of figures loaded for
+  tracked companies. Tested on the live site end to end: sign up with a device
+  portfolio, sign out to the demo, a wrong password, sign back in, chart tooltip.
+- **Went wrong:** the lighter dark-mode violet failed the palette check's lightness
+  band; a darker step passes. My first account test navigated away before a save
+  finished, so its cookie never arrived; the test now waits. Next.js's route announcer
+  also carries role="alert", so tests target the form's own message. The local sandbox
+  cannot open TCP to Neon, so accounts were tested on the deployed site.

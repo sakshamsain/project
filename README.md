@@ -11,7 +11,12 @@ A mobile-first financial investment agent that works like an editor with a memor
   management guided against what it delivered.
 
 **Live:** https://finn-blue.vercel.app (opens on a demo portfolio of 18 NSE companies;
-add or remove one and your device gets its own copy).
+add or remove one and your device gets its own copy, or create an account to keep it on
+every device).
+
+What is in the app: the Brief (Today), Pulse (end-of-day moves), company pages with
+interactive price and quarterly results charts, the Promise Ledger for any NSE company
+(Research), results and people cards, notifications, accounts, and search.
 
 > Status: build week, 8–15 Nov 2026. This README grows with the build; see
 > `docs/BUILD_LOG.md` for progress.
