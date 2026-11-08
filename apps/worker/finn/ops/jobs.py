@@ -111,6 +111,11 @@ def run_poll(url: str, nse: Nse, at: datetime | None = None) -> dict[str, Any]:
     if hasattr(nse, "integrated_filings"):
         out["results"] = run_results(url, nse, days=10, limit=4)
         out["people"] = run_people(url, nse, make_llm(url), days=10, limit=3)
+        from finn.ops.research_jobs import claim, run_job
+
+        job = claim(url)
+        if job is not None:
+            out["research"] = run_job(url, nse, make_llm(url), job)
     out["notify"] = run_notify(url, at)
     return out
 

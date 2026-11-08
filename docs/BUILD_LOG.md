@@ -74,3 +74,25 @@ Three lines a day: what was asked, what went wrong, what changed.
   transcripts and annual reports into `documents`/`doc_pages`, guidance extraction, the
   Promise Ledger against the quarterly figures now stored in `financials`; (4) evals and
   the covering note.
+
+## Sun 8 Nov 2026 (Day 0, night): people cards, the Promise Ledger, research on request
+
+- **Asked:** carry on after the usage limit reset.
+- **Changed:** a model client (`finn.llm.client`: tiers, retries, fallbacks, cache, call
+  log). People cards from change-of-director filings, every background sentence verified
+  against the PDF with its page. Test notifications from Settings. The Promise Ledger:
+  last four earnings-call transcripts per company from NSE, guidance extracted with exact
+  quotes, checked in code against quarterly XBRL figures (Infosys: operating margin
+  promise of 20 to 22% on track at 21.0% for H1 FY27; FY26 delivered at 20.9%; revenue
+  guidance cut from 1.5–3.5% to 1–2% across the year, all quoted with pages). Ledgers on
+  request for any NSE symbol: TCS built from the live app in 26 seconds. 193 tests.
+- **Went wrong:** the transcript finder first took an AGM and an "AI Day" transcript as
+  quarterly calls; it now ranks earnings calls and skips other events. The model tagged
+  "EBIT margin" as EBITDA, read an opex-to-income ratio as a margin, and missed that
+  "without the Vivo" makes a figure adjusted; code now requires the quote to name the
+  measure and marks exclusions itself. HCLTECH's constant-currency guidance was read as
+  rupees until the prompt asked for the call-wide basis. A first prompt let past results
+  ("surpassed $2.3 billion") in as promises.
+- **Next:** delivery statements from later calls for promises the filings cannot measure
+  (AUM, order inflow); evals (classification, quote survival, ledger precision on a
+  hand-checked set); the covering note.

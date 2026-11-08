@@ -1,13 +1,25 @@
 import Link from "next/link";
 import { STATUS } from "@/components/Ledger";
 import { listLedgers, type LedgerStatus } from "@/lib/research";
+import { requestLedger } from "./actions";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Research" };
 
 const SHOWN: LedgerStatus[] = ["delivered", "on_track", "off_track", "missed", "not_measurable"];
 
-export default async function Research() {
+const ERRORS: Record<string, string> = {
+  symbol: "Type an NSE symbol, such as TCS or ASIANPAINT.",
+  unknown: "That symbol is not listed on NSE.",
+  limit: "This device has asked for 10 new ledgers today; ledgers already built stay open to all.",
+};
+
+export default async function Research({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; q?: string }>;
+}) {
+  const { error, q } = await searchParams;
   const ledgers = await listLedgers();
   return (
     <main className="page">
@@ -27,6 +39,35 @@ export default async function Research() {
           FINN reads each company&apos;s last four earnings-call transcripts on NSE, quotes every
           promise with its page, and checks it against the quarterly figures the company filed.
           Nothing else goes in: no news, no broker notes.
+        </p>
+      </section>
+
+      <section className="section" aria-labelledby="build">
+        <h2 className="section-title" id="build">
+          Any NSE company
+        </h2>
+        <form action={requestLedger} className="row-form" style={{ marginBottom: "0.5rem" }}>
+          <label className="visually-hidden" htmlFor="symbol">
+            NSE symbol
+          </label>
+          <input
+            id="symbol"
+            name="symbol"
+            type="text"
+            placeholder="NSE symbol, e.g. TCS"
+            defaultValue={q ?? ""}
+            autoCapitalize="characters"
+            autoComplete="off"
+            required
+          />
+          <button className="button" type="submit">
+            Build ledger
+          </button>
+        </form>
+        {error && ERRORS[error] && <p className="notice">{ERRORS[error]}</p>}
+        <p className="section-note">
+          FINN reads the company&apos;s last four call transcripts and its filed results; it takes
+          about a minute.
         </p>
       </section>
 

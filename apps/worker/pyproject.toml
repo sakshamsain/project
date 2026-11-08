@@ -52,5 +52,5 @@ packages = ["finn"]
 
 [[tool.mypy.overrides]]
 # Third-party packages that ship without type information.
-module = ["yfinance.*", "nse.*", "bse.*", "selectolax.*", "fitz.*", "pdfplumber.*", "fastembed.*", "litellm.*", "sentry_sdk.*", "pywebpush.*"]
+module = ["yfinance.*", "nse.*", "bse.*", "selectolax.*", "fitz.*", "pdfplumber.*", "fastembed.*", "litellm.*", "sentry_sdk.*", "pywebpush.*", "fastapi.*"]
 ignore_missing_imports = true

@@ -18,7 +18,7 @@ from finn.pull.fiscal import Period, parse_period
 from finn.pull.quotes import normalize, verify_quote
 from finn.sources.pdf import PdfText
 
-PROMPT_VERSION = "guidance-v2"
+PROMPT_VERSION = "guidance-v3"
 METRIC_KEYS = [
     "revenue",
     "revenue_growth",
@@ -53,6 +53,8 @@ List the forward-looking statements made by the company's management (never by \
 analysts) that commit to an outcome: guidance for revenue or its growth, margins, profit, \
 capital expenditure, capacity, order inflow, loan or AUM growth, credit cost and similar, \
 and dated commitments such as a plant starting by a given quarter.
+Leave out results already achieved ("grew 12%", "surpassed $2 billion"), descriptions of \
+the past quarter, and hopes with no measurable outcome.
 For each statement:
 - quote: copy the shortest exact span that contains it, at most two sentences, character \
 for character as in the transcript. Never shorten, join or reword.

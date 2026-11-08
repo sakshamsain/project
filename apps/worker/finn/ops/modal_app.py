@@ -30,6 +30,7 @@ image = (
         "sentry-sdk>=2.0",
         "pywebpush>=2.0",
         "pymupdf>=1.24",
+        "fastapi[standard]>=0.115",
     )
     # rules.yaml and models.yaml ship with the code; the default filter keeps only .py files.
     .add_local_python_source("finn", ignore=["**/__pycache__", "**/*.pyc"])
@@ -165,6 +166,39 @@ def dossier(symbol: str, transcripts: int = 4) -> dict[str, Any]:
 
     url = _setup()
     return _log("dossier", build_dossier(url, _client(), make_llm(url), symbol, transcripts))
+
+
+@app.function(image=image, secrets=secrets, timeout=3600)
+def research_job(job_id: int) -> dict[str, Any]:
+    """Build the ledger a reader asked for."""
+    from finn.ops.jobs import make_llm
+    from finn.ops.research_jobs import claim, run_job
+
+    url = _setup()
+    job = claim(url, job_id)
+    if job is None:
+        return _log("research_job", {"job": job_id, "status": "not queued"})
+    return _log("research_job", run_job(url, _client(), make_llm(url), job))
+
+
+@app.function(image=image, secrets=secrets, timeout=60)
+@modal.fastapi_endpoint(method="POST")
+def request_research(body: dict[str, Any]) -> dict[str, Any]:
+    """Called by the app after it records a request; starts the build at once.
+    The shared token travels in the JSON body over HTTPS."""
+    import hmac
+
+    from fastapi import HTTPException
+
+    secret = os.environ.get("FINN_TRIGGER_TOKEN", "")
+    given = str(body.get("token", ""))
+    if not secret or not hmac.compare_digest(given.encode(), secret.encode()):
+        raise HTTPException(status_code=401, detail="unauthorised")
+    job_id = body.get("job_id")
+    if not isinstance(job_id, int):
+        raise HTTPException(status_code=400, detail="job_id must be an integer")
+    research_job.spawn(job_id)
+    return {"started": job_id}
 
 
 @app.function(image=image, secrets=secrets, timeout=120)

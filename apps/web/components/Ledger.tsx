@@ -103,7 +103,11 @@ export function ThreadCard({ t }: { t: Thread }) {
       <header className="thread-head">
         <h3>
           {title(latest)}
-          {latest.period_label ? <span className="thread-period">{latest.period_label}</span> : null}
+          {latest.period_label && latest.period_label !== "unspecified" ? (
+            <span className="thread-period">{latest.period_label}</span>
+          ) : (
+            <span className="thread-period">no date given</span>
+          )}
         </h3>
         <span className={`chip ${latest.status}`}>{STATUS[latest.status]}</span>
       </header>

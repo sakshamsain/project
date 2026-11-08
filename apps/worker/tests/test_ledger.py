@@ -104,3 +104,11 @@ def test_segment_and_adjusted_targets_are_not_checked_against_the_company() -> N
         "excluding the JV",
     )
     assert check(adj, SERIES).status == "not_measurable"
+
+
+def test_unnamed_measure_says_why_it_is_not_checked() -> None:
+    p = Promise(
+        "other", "margin", "inr", 25, None, "%", Period(27, "Q4"), claimed_metric="ebit_margin"
+    )
+    c = check(p, SERIES)
+    assert c.status == "not_measurable" and "does not name the measure" in c.note

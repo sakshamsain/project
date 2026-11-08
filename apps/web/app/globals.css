@@ -931,3 +931,19 @@ input[type="number"] {
 .rev.changed {
   color: var(--muted);
 }
+
+.building-title {
+  margin: 0 0 0.25rem;
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .building {
+    animation: breathe 1.6s ease-in-out infinite;
+  }
+  @keyframes breathe {
+    50% {
+      border-color: var(--stamp);
+    }
+  }
+}

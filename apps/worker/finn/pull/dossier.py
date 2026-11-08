@@ -8,6 +8,7 @@ whole, and every check is recomputed from the quarters on file.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import date
 from typing import Any, Protocol
 
@@ -97,7 +98,8 @@ def recheck(conn: Conn, isin: str, series: dict[str, StatementLines]) -> dict[st
     rows = fetch_all(
         conn,
         "select id, metric_key, kind, basis, value_low, value_high, unit, period_label,"
-        " call_date, scope, scope_note from guidance where isin = %s",
+        " call_date, scope, scope_note, extraction ->> 'metric_key' as claimed"
+        " from guidance where isin = %s",
         [isin],
     )
     for r in rows:
@@ -113,6 +115,7 @@ def recheck(conn: Conn, isin: str, series: dict[str, StatementLines]) -> dict[st
                 period=period,
                 scope=str(r["scope"] or "company"),
                 scope_note=r["scope_note"],
+                claimed_metric=r["claimed"],
             ),
             series,
         )
@@ -133,6 +136,7 @@ def build_dossier(
     symbol: str,
     transcripts: int = 4,
     today: date | None = None,
+    progress: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     from finn.core.db import connect
 
@@ -142,8 +146,11 @@ def build_dossier(
     if found is None:
         return {"symbol": symbol, "status": "unknown symbol"}
     isin, name = found
+    say = progress or (lambda _msg: None)
 
+    say("Finding earnings-call transcripts on NSE")
     refs: list[TranscriptRef] = find_transcripts(src, symbol.upper(), today)[:transcripts]
+    say(f"Found {len(refs)} transcripts; reading the quarterly figures filed with NSE")
     basis, quarters = quarterly_results(src, symbol.upper(), quarters=10)
     series = lines_by_label(quarters)
     with connect(url) as conn:
@@ -186,6 +193,7 @@ def build_dossier(
             if text.scanned:
                 docs.append({**entry, "status": "scanned", "pages": len(pages)})
                 continue
+        say(f"Reading the {ref.period.replace('FY', ' FY')} call ({len(pages)} pages)")
         verified, model = extract_guidance(llm, pages, name, ref.filed_at_date, ref.period)
         with connect(url) as conn:
             store_guidance(conn, isin, int(doc_id or 0), ref.filed_at_date, verified.items)
@@ -202,6 +210,7 @@ def build_dossier(
             }
         )
 
+    say(f"Checking promises against {len(quarters)} quarters of filed figures")
     with connect(url) as conn:
         current = [int(d["document_id"]) for d in docs if d.get("document_id")]
         # Promises from transcripts no longer in the last four calls leave the ledger.

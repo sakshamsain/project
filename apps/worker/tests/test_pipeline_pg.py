@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from finn.core.db import connect, fetch_all
+from finn.core.db import Jsonb, connect, fetch_all
 from finn.ops.seed import DEMO_PROFILE_ID, seed_companies, seed_demo_profile
 from finn.push import eod
 from finn.push.pipeline import ingest_announcements
@@ -264,3 +264,25 @@ def test_quiet_hours_hold_then_release(clean_db: str) -> None:
         assert notify.release_held(conn, morning) == 1
         status = fetch_all(conn, "select status from notifications")
     assert [r["status"] for r in status] == ["queued"]
+
+
+def test_research_jobs_are_claimed_once(clean_db: str) -> None:
+    from finn.ops.research_jobs import claim, finish, set_progress
+
+    with connect(clean_db) as conn:
+        rows = fetch_all(
+            conn,
+            "insert into jobs (kind, payload) values ('dossier', %s), ('dossier', %s) returning id",
+            [Jsonb({"symbol": "INFY"}), Jsonb({"symbol": "TCS"})],
+        )
+    first, second = int(rows[0]["id"]), int(rows[1]["id"])
+    job = claim(clean_db, second)
+    assert job is not None and int(job["id"]) == second
+    assert claim(clean_db, second) is None  # already running
+    set_progress(clean_db, second, "Reading the Q2 FY27 call")
+    finish(clean_db, second, True, {"message": "Done"})
+    nxt = claim(clean_db)
+    assert nxt is not None and int(nxt["id"]) == first
+    with connect(clean_db) as conn:
+        status = {int(r["id"]): r["status"] for r in fetch_all(conn, "select id, status from jobs")}
+    assert status == {first: "running", second: "done"}

@@ -81,3 +81,23 @@ NSE describes each attachment in one sentence and sometimes summarises it. Strip
 "has informed the Exchange regarding" frame gives a usable headline for most filings, and
 a results press release lends its title (which leads with the numbers) to its results
 event. Models will rewrite only front-page headlines, from the filing alone.
+
+## 016 · People cards quote the filing
+SEBI makes a company publish a brief profile of each director or KMP it appoints. The
+people card is that profile, quoted: a model picks the people and the sentences,
+`verify_quote` keeps only sentences really in the PDF (the page comes from the text), and
+a name not in the filing drops the person. For more, the card offers a LinkedIn search
+link; FINN does not fetch or scrape profiles.
+
+## 017 · The ledger checks only what the filings can measure
+A promise is checked against quarterly XBRL figures only when it is company-wide, in
+rupees, names a measure code can compute (EBIT is not EBITDA), and states figures that
+appear in the quote. Constant-currency growth, segment targets, adjusted figures, AUM,
+order inflow and hiring are kept, quoted and tracked from call to call, marked "not in
+the filings" with the reason. A wrong tick is worse than an honest "cannot check".
+
+## 018 · Research on request: a job row, a ping, and a poll as backstop
+The app records a request as a `jobs` row and pings a token-protected Modal endpoint,
+which starts the build at once; the 5-minute poll claims anything the ping missed (FOR
+UPDATE SKIP LOCKED). Progress is written to the row and shown on the page. Ten new
+ledgers per device per day; built ledgers are open to everyone.

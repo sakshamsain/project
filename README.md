@@ -61,3 +61,18 @@ cd apps/web && npm install && npm run build
 Code computes every number; rules classify before models do; model output is grounded
 in primary filings with page citations; holdings never enter a prompt. See
 `docs/DECISIONS.md`.
+
+
+## How the Promise Ledger is made
+
+1. For any NSE symbol, the worker finds the last four earnings-call transcripts filed with
+   NSE (AGM and investor-day transcripts are skipped) and stores each page's text.
+2. A model lists management's forward-looking promises, copying each sentence word for
+   word with its page.
+3. Code keeps a promise only if the sentence is in the transcript, keeps a figure only if
+   it appears in the sentence, requires the sentence to name the measure, and marks
+   segment targets and adjusted figures.
+4. Code computes the result for the promised period from the company's quarterly XBRL
+   filings and marks it delivered, missed, on track, off track, too early, or not in the
+   filings, with the comparison written out.
+5. Type a symbol on the Research tab and a ledger is built in about a minute.

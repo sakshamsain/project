@@ -48,6 +48,7 @@ class Promise:
     period: Period | None
     scope: str = "company"  # company | segment | adjusted
     scope_note: str | None = None
+    claimed_metric: str | None = None  # what the model said it was, before code checked
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,6 +120,14 @@ def _range(p: Promise) -> str:
 
 
 def check(p: Promise, series: Mapping[str, StatementLines]) -> Check:
+    if p.metric_key not in COMPUTABLE and p.claimed_metric in COMPUTABLE:
+        return Check(
+            "not_measurable",
+            None,
+            "The sentence does not name the measure, so FINN does not check it.",
+        )
+    if p.kind == "qualitative" and p.metric_key in COMPUTABLE:
+        return Check("not_measurable", None, "No figure was stated.")
     if p.kind == "qualitative" or p.metric_key not in COMPUTABLE:
         return Check("not_measurable", None, "Filed statements do not report this measure.")
     if p.scope == "segment":

@@ -1,17 +1,66 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import JobProgress from "@/components/JobProgress";
 import { STATUS, ThreadCard, threads } from "@/components/Ledger";
 import { fmtDay } from "@/lib/format";
+import { query } from "@/lib/db";
 import { getLedger, type LedgerStatus } from "@/lib/research";
+import { requestLedger } from "../actions";
 
 export const dynamic = "force-dynamic";
 
 const MEASURED: LedgerStatus[] = ["delivered", "missed", "on_track", "off_track", "too_early"];
 
-export default async function LedgerPage({ params }: { params: Promise<{ symbol: string }> }) {
+export default async function LedgerPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ symbol: string }>;
+  searchParams: Promise<{ job?: string }>;
+}) {
   const { symbol } = await params;
-  const data = await getLedger(decodeURIComponent(symbol));
-  if (!data) notFound();
+  const { job } = await searchParams;
+  const sym = decodeURIComponent(symbol).toUpperCase();
+  const data = await getLedger(sym);
+  const jobId = job && /^\d+$/.test(job) ? job : null;
+  if (!data || jobId) {
+    const [c] = await query<{ name: string }>(
+      `select c.name from company_aliases a join companies c on c.isin = a.isin
+        where a.kind = 'nse_symbol' and a.value = $1 and a.valid_to is null limit 1`,
+      [sym],
+    );
+    if (!data) {
+      return (
+        <main className="page">
+          <header className="masthead">
+            <Link className="wordmark" href="/research">
+              FINN
+            </Link>
+            <span className="dateline">Promise ledger</span>
+          </header>
+          <section className="triage">
+            <span className="stamp">{sym}</span>
+            <h1 className="triage-line" style={{ fontSize: "clamp(1.8rem, 7vw, 2.5rem)", marginTop: "0.5rem" }}>
+              {c?.name ?? "Not listed on NSE"}
+            </h1>
+          </section>
+          {jobId ? (
+            <JobProgress id={jobId} />
+          ) : c ? (
+            <form action={requestLedger}>
+              <input type="hidden" name="symbol" value={sym} />
+              <p className="section-note">No ledger yet for this company.</p>
+              <button className="button" type="submit">
+                Build ledger
+              </button>
+            </form>
+          ) : (
+            <p className="empty">Check the symbol and try again from Research.</p>
+          )}
+        </main>
+      );
+    }
+  }
+  if (!data) return null;
   const { body, promises, company } = data;
   const all = threads(promises);
   const checked = all.filter((t) => MEASURED.includes(t.items[0].status));
@@ -26,6 +75,7 @@ export default async function LedgerPage({ params }: { params: Promise<{ symbol:
         <span className="dateline">Promise ledger</span>
       </header>
 
+      {jobId && <JobProgress id={jobId} />}
       <section className="triage" aria-label="Summary">
         <Link className="stamp" href={`/company/${encodeURIComponent(body.symbol)}`}>
           {body.symbol}
@@ -34,7 +84,8 @@ export default async function LedgerPage({ params }: { params: Promise<{ symbol:
           {company}
         </h1>
         <p className="triage-sub">
-          {promises.length} promises from {read.length} earnings calls. {checked.length} can be checked against the figures the company filed
+          {promises.length} promises from {read.length} earnings calls.{" "}
+          {checked.length === 0 ? "None" : checked.length} can be checked against the figures the company filed
           ({body.quarters_on_file.length} quarters, {body.basis?.toLowerCase() ?? "as filed"});
           the rest are about things the filings do not report.
         </p>
