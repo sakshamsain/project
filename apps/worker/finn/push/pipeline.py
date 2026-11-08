@@ -86,7 +86,7 @@ def ingest_announcements(
         isin = isin_of.get(a.symbol)
         if isin is None:
             continue
-        c = classify(a.subject, a.subject, a.body)
+        c = classify(a.subject, a.subject, a.text, summary=a.summary)
         category = c.category if c else "unclassified"
         attributes = dict(c.attributes) if c else {}
         if c is None:
@@ -243,6 +243,7 @@ def _with_members(conn: Conn, heads: Sequence[Mapping[str, Any]]) -> list[EventD
             family=str(h["family"]),
             event_id=int(h["id"]),
             reaction=(h.get("enrichment") or {}).get("reaction"),
+            results_card=(h.get("enrichment") or {}).get("results_card"),
         )
         for h in heads
     }

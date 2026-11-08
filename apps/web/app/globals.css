@@ -686,3 +686,85 @@ input[type="number"] {
     }
   }
 }
+
+/* ---------- results card ---------- */
+
+.results {
+  margin: 0.6rem 0 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-panel);
+  padding: 0.75rem 0.85rem 0.6rem;
+  max-width: 28rem;
+}
+
+.results figcaption {
+  font-size: 0.8125rem;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+
+.results table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-size: 0.9375rem;
+}
+
+.results th,
+.results td {
+  padding: 0.28rem 0;
+  text-align: right;
+  border-bottom: 1px solid var(--rule);
+}
+
+.results thead th {
+  font-weight: 500;
+  font-size: 0.75rem;
+  color: var(--faint);
+}
+
+.results tbody th {
+  text-align: left;
+  font-weight: 600;
+}
+
+.results tbody tr:last-child th,
+.results tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.results td.na {
+  color: var(--faint);
+}
+
+.results-note {
+  margin: 0.4rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--ink);
+}
+
+.results-note.flag {
+  color: var(--warn);
+}
+
+.results-note.fine {
+  color: var(--faint);
+  font-size: 0.75rem;
+}
+
+.nse-summary {
+  margin-top: 0.35rem;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.nse-summary summary {
+  cursor: pointer;
+  color: var(--stamp);
+  font-size: 0.8125rem;
+}
+
+.nse-summary p {
+  margin: 0.3rem 0 0;
+}

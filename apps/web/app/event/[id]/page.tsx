@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ReactionLine, Ticker, Why } from "@/components/brief";
+import ResultsCard from "@/components/ResultsCard";
 import { fmtDay, fmtMultiple, fmtPct, fmtWhen } from "@/lib/format";
 import { ANOMALY, categoryLabel } from "@/lib/labels";
 import { getEvent } from "@/lib/queries";
@@ -36,6 +37,9 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
         <p className="section-note" style={{ margin: "0 0 0.5rem" }}>
           {categoryLabel(e.category, e.stage)}, first filed {fmtWhen(e.first_seen_at)} IST
         </p>
+        {e.enrichment?.results_card && (
+          <ResultsCard card={e.enrichment.results_card} filingUrl={filings[0]?.attachment_url} />
+        )}
         {reaction && <ReactionLine r={reaction} />}
         <Why b={e.score_breakdown} category={e.category} stage={e.stage} />
       </article>
@@ -82,16 +86,21 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
                 )}
                 <span className="line-kind">
                   {f.subject}
-                  {f.classified_by === "rules" && f.rule_id ? `, sorted by rule ${f.rule_id}` : ""}
+                  {f.classified_by === "rules" && f.rule_id ? `, matched rule ${f.rule_id}` : ""}
                 </span>
-                {f.summary && <p className="section-note" style={{ margin: "0.4rem 0 0" }}>{f.summary}</p>}
+                {f.summary && (
+                  <details className="nse-summary">
+                    <summary>NSE&apos;s summary</summary>
+                    <p>{f.summary}</p>
+                  </details>
+                )}
               </div>
               <time dateTime={f.filed_at}>{fmtWhen(f.filed_at)}</time>
             </li>
           ))}
         </ul>
         <p className="section-note" style={{ marginTop: "0.75rem" }}>
-          Summaries in grey are written by NSE. FINN links every filing to its PDF on the exchange.
+          Each filing links to its PDF on NSE. Summaries are written by NSE, not by FINN.
         </p>
       </section>
     </main>

@@ -138,6 +138,14 @@ def rebuild(rescan_sessions: int = 45) -> dict[str, Any]:
     return _log("rebuild", run_rebuild(_setup(), rescan_sessions))
 
 
+@app.function(image=image, secrets=secrets, timeout=3600)
+def results(days: int = 30, limit: int = 40, force: bool = False) -> dict[str, Any]:
+    """Results cards for recent results events on held companies."""
+    from finn.ops.jobs import run_results
+
+    return _log("results", run_results(_setup(), _client(), days=days, limit=limit, force=force))
+
+
 @app.function(image=image, secrets=secrets, timeout=120)
 def env_check() -> dict[str, Any]:
     """Which expected settings are present (names only, never values)."""

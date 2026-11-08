@@ -1,0 +1,29 @@
+{
+ "rows": 20,
+ "keys": [
+  "attFileSize",
+  "audited",
+  "broadcast_Date",
+  "cmName",
+  "consolidated",
+  "creation_Date",
+  "diff",
+  "ixbrl",
+  "ixbrlFileSize",
+  "pdf_attach",
+  "qe_Date",
+  "revised_Date",
+  "revision_Remark",
+  "seq_Id",
+  "smName",
+  "symbol",
+  "type",
+  "type_Sub",
+  "xbrl",
+  "xbrlFileSize"
+ ],
+ "types": [
+  "Integrated Filing- Financials",
+  "Integrated Filing- Governance"
+ ]
+}

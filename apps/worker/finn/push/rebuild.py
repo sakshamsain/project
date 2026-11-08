@@ -32,8 +32,7 @@ def reclassify(conn: Conn) -> int:
     confs: list[float | None] = []
     bys: list[str | None] = []
     for r in rows:
-        body = " ".join(x for x in (r["body_text"], r["summary"]) if x)
-        c = classify(r["subject"], r["exchange_category"], body)
+        c = classify(r["subject"], r["exchange_category"], r["body_text"], summary=r["summary"])
         category = c.category if c else "unclassified"
         attributes = dict(c.attributes) if c else {}
         rule_id = c.rule_id if c else None

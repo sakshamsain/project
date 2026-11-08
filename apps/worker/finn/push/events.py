@@ -101,6 +101,7 @@ class EventDraft:
     members: list[FilingFacts] = field(default_factory=list)
     event_id: int | None = None  # set when the event already exists
     reaction: Mapping[str, Any] | None = None  # from the EOD job, kept across rescoring
+    results_card: Mapping[str, Any] | None = None  # from the results job
 
     @property
     def first_seen_at(self) -> datetime:
@@ -192,7 +193,7 @@ def build(draft: EventDraft, prior_first_seen: Sequence[datetime] = ()) -> Event
         first_seen_at=start,
         last_filed_at=draft.last_filed_at,
         filing_count=len(draft.members),
-        headline=headline_for(lead.subject, lead.text, lead.summary),
+        headline=_headline(draft, lead),
         score=b.score,
         tier=absolute_tier(b),
         breakdown={
@@ -211,14 +212,71 @@ def build(draft: EventDraft, prior_first_seen: Sequence[datetime] = ()) -> Event
     )
 
 
+def _is_release(m: FilingFacts) -> bool:
+    return m.attributes.get("stage") == "press_release" or m.subject.lower().startswith(
+        "press release"
+    )
+
+
 def _headline_source(draft: EventDraft, rep: FilingFacts) -> FilingFacts:
     """Results events take their headline from the company's own release when there is
     one: it leads with the numbers, where the filing's description only names the period."""
     if draft.family == "results":
         for m in sorted(draft.members, key=lambda x: x.filed_at):
-            if m.attributes.get("stage") == "press_release":
+            if _is_release(m):
                 return m
     return rep
+
+
+def _crore(x: float) -> str:
+    """Indian digit grouping, no decimals: 126230 -> 1,26,230."""
+    n = round(abs(x))
+    s = str(n)
+    if len(s) > 3:
+        head, tail = s[:-3], s[-3:]
+        groups: list[str] = []
+        while len(head) > 2:
+            groups.insert(0, head[-2:])
+            head = head[:-2]
+        if head:
+            groups.insert(0, head)
+        s = ",".join(groups) + "," + tail
+    return ("\u2212" if x < 0 else "") + s
+
+
+def _signed(x: float) -> str:
+    return f"{'\u2212' if x < 0 else '+'}{abs(x):.1f}%"
+
+
+def results_headline(card: Mapping[str, Any]) -> str | None:
+    """A results headline built from the computed card: the period, the top line and the
+    bottom line, each with its year-on-year change (or quarter-on-quarter without one)."""
+    if card.get("status") != "ok":
+        return None
+    rows = {r["name"]: r for r in card.get("rows", [])}
+    top = rows.get("NII") or rows.get("Revenue")
+    pat = rows.get("PAT")
+    if top is None or pat is None:
+        return None
+
+    def part(label: str, r: Mapping[str, Any]) -> str:
+        text = f"{label} \u20b9{_crore(r['value'])} Cr"
+        if r.get("yoy_pct") is not None:
+            return f"{text}, {_signed(r['yoy_pct'])} YoY"
+        if r.get("qoq_pct") is not None:
+            return f"{text}, {_signed(r['qoq_pct'])} QoQ"
+        return text
+
+    label = "NII" if top is rows.get("NII") else "revenue"
+    return f"{card.get('period', 'Results')}: {part(label, top)}; {part('PAT', pat)}"
+
+
+def _headline(draft: EventDraft, lead: FilingFacts) -> str:
+    if draft.family == "results" and not _is_release(lead) and draft.results_card:
+        from_card = results_headline(draft.results_card)
+        if from_card:
+            return from_card
+    return headline_for(lead.subject, lead.text, lead.summary)
 
 
 def _opt_float(v: Any) -> float | None:

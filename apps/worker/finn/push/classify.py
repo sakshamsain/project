@@ -158,20 +158,26 @@ def classify(
     exchange_category: str | None = None,
     body: str | None = None,
     rules: Sequence[Rule] | None = None,
+    summary: str | None = None,
 ) -> Classification | None:
+    """Subject first; then the filing's own description; then, only if nothing has
+    matched, the exchange's summary, which mentions everything filed alongside (a release
+    summary that says "and an investor presentation" must not make it a presentation)."""
     active = rules if rules is not None else load_rules()
     subject = _squash(subject)
-    full = _squash(" ".join((subject, (body or "")[:BODY_CHARS])))
+    described = _squash(" ".join((subject, (body or "")[:BODY_CHARS])))
+    summarised = _squash(" ".join((described, (summary or "")[:BODY_CHARS])))
     hit: Rule | None = None
     if not is_generic(subject):
         hit = _match(active, _squash(f"{subject} {exchange_category or ''}"))
     if hit is None:
-        hit = _match(active, full)
+        hit = _match(active, described) or _match(active, summarised)
     elif hit.id in BROAD_RULES:
-        specific = _match([r for r in active if r.id not in BROAD_RULES], full)
+        narrower = [r for r in active if r.id not in BROAD_RULES]
+        specific = _match(narrower, described)
         if specific is not None and specific.category != "unclassified":
             hit = specific
     if hit is None:
         return None
-    attrs = {**extract_attributes(hit.category, full), **hit.attributes}
+    attrs = {**extract_attributes(hit.category, summarised), **hit.attributes}
     return Classification(hit.category, attrs, hit.confidence, hit.id)

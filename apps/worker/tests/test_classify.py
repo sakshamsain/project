@@ -122,8 +122,7 @@ def test_coverage_on_recorded_nse_filings() -> None:
     rows += json.loads((FIXTURES / "announcements_TATAPOWER_30d.json").read_text())
     classified = 0
     for r in rows:
-        body = " ".join(x for x in (r.get("attchmntText"), r.get("voiceSummary")) if x)
-        if classify(r["desc"], r["desc"], body) is not None:
+        if classify(r["desc"], r["desc"], r.get("attchmntText"), summary=r.get("voiceSummary")):
             classified += 1
     assert classified / len(rows) >= 0.9
 
@@ -174,3 +173,25 @@ def test_internal_restructuring_is_marked() -> None:
         "Investments Limited, wholly owned subsidiary",
     )
     assert c is not None and c.category == "M&A" and c.attributes.get("kind") == "internal"
+
+
+def test_a_release_is_not_reclassified_by_what_its_summary_mentions() -> None:
+    c = classify(
+        "Press Release",
+        "Press Release",
+        "Tata Steel Limited has informed the Exchange regarding a press release dated November "
+        '07, 2026, titled "Tata Steel reports Consolidated EBITDA of Rs 10,665 crores for the '
+        'quarter".',
+        summary="Tata Steel submitted a press release and investor presentation to BSE and NSE.",
+    )
+    assert c is not None and c.rule_id == "results_press_release"
+
+
+def test_summary_decides_only_when_nothing_else_matched() -> None:
+    c = classify(
+        "General Updates",
+        "General Updates",
+        "Tata Power Company Limited has informed the Exchange about General Updates",
+        summary="Tata Power filed a notice of appeal before the Singapore Court of Appeal.",
+    )
+    assert c is not None and c.category == "litigation"

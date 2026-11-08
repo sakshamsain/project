@@ -108,19 +108,22 @@ def build_card(
     bank_like: bool = False,
 ) -> ResultsCard:
     op_name = "PPOP" if bank_like else "EBITDA (excl. other income)"
-    rev_name = "Revenue"
+    lender_nii = bank_like and current.net_interest_income is not None
+    rev_name, rev_attr = (
+        ("NII", "net_interest_income") if lender_nii else ("Revenue", "revenue_from_operations")
+    )
 
     def line(s: StatementLines | None, attr: str) -> float | None:
         if s is None:
             return None
         if attr == "operating":
             return _operating_line(s, bank_like)
-        value: float = getattr(s, attr)
+        value: float | None = getattr(s, attr)
         return value
 
     rows = []
     for name, attr in (
-        (rev_name, "revenue_from_operations"),
+        (rev_name, rev_attr),
         (op_name, "operating"),
         ("PBT", "profit_before_tax"),
         ("PAT", "profit_after_tax"),
@@ -137,11 +140,9 @@ def build_card(
         )
 
     def op_margin(s: StatementLines | None) -> float | None:
-        return (
-            None
-            if s is None
-            else margin_pct(_operating_line(s, bank_like), s.revenue_from_operations)
-        )
+        if s is None or bank_like:  # a lender's PPOP over income is not a margin anyone reads
+            return None
+        return margin_pct(_operating_line(s, bank_like), s.revenue_from_operations)
 
     m_cur = op_margin(current)
     flags = []

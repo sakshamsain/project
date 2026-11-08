@@ -53,7 +53,7 @@ def clean_description(text: str) -> str:
     s = _OF_COMPANY.sub("", s)
     s = _BROKEN_HYPHEN.sub(r"\1-\2", s)
     s = re.sub(r"\s+([,.;:])", r"\1", s)
-    s = re.sub(r"\s+", " ", s).strip(" ;,")
+    s = re.sub(r"\s+", " ", s).strip(" ;,:-")
     if s.lower().startswith(("a ", "an ", "the ")) and len(s) > 3 or s and s[0].islower():
         s = s[0].upper() + s[1:]
     return s

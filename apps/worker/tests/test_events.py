@@ -152,3 +152,25 @@ def test_results_event_takes_the_release_title_as_headline() -> None:
     row = build(d[0])
     assert row.headline.startswith("Tata Steel reports Consolidated EBITDA")
     assert row.breakdown["representative"] == "res"
+
+
+def test_results_headline_from_the_card_when_there_is_no_release() -> None:
+    from finn.push.events import results_headline
+
+    card = {
+        "status": "ok",
+        "period": "Q2 FY27",
+        "rows": [
+            {"name": "Revenue", "value": 126230.4, "qoq_pct": 7.6, "yoy_pct": 11.5},
+            {"name": "EBITDA (excl. other income)", "value": 10533.07, "qoq_pct": 1, "yoy_pct": 2},
+            {"name": "PBT", "value": 5342.88, "qoq_pct": 1, "yoy_pct": 2},
+            {"name": "PAT", "value": -3699.59, "qoq_pct": -55.1, "yoy_pct": None},
+        ],
+    }
+    assert results_headline(card) == (
+        "Q2 FY27: revenue \u20b91,26,230 Cr, +11.5% YoY; PAT \u20b9\u22123,700 Cr, \u221255.1% QoQ"
+    )
+    d = assign([f("res", "results", 0, stage="filing")], [])[0]
+    d.results_card = card
+    assert build(d).headline.startswith("Q2 FY27: revenue")
+    assert results_headline({"status": "needs_a_look"}) is None

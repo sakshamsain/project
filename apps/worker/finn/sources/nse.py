@@ -349,6 +349,77 @@ def is_results_meeting(m: BoardMeeting) -> bool:
     return bool(re.search(r"financial results?|\bresults\b|financials", m.description, re.I))
 
 
+# --- integrated filing (financials) -------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class IntegratedFiling:
+    """One results filing under SEBI's Integrated Filing, with its XBRL."""
+
+    symbol: str
+    quarter_end: date
+    basis: str  # Consolidated | Standalone
+    audited: str | None
+    xbrl_url: str
+    filed_at: datetime | None
+    revision: bool
+    seq_id: str
+    taxonomy: str  # indas | nbfc | banking | other, from the XBRL file name
+
+
+def parse_integrated_filings(payload: Any) -> list[IntegratedFiling]:
+    """Financials rows with an XBRL file, newest first; governance rows are dropped."""
+    rows = payload.get("data", []) if isinstance(payload, Mapping) else payload
+    out: list[IntegratedFiling] = []
+    for r in rows or []:
+        if "financial" not in _text(r.get("type")).lower():
+            continue
+        url = _text(r.get("xbrl"))
+        qe = parse_date(_text(r.get("qe_Date")))
+        basis = _text(r.get("consolidated")).title()
+        if not url.endswith(".xml") or qe is None or basis not in {"Consolidated", "Standalone"}:
+            continue
+        name = url.rsplit("/", 1)[-1].upper()
+        taxonomy = (
+            "banking"
+            if "BANKING" in name
+            else "nbfc"
+            if "NBFC" in name
+            else "indas"
+            if "INDAS" in name
+            else "other"
+        )
+        out.append(
+            IntegratedFiling(
+                symbol=_text(r.get("symbol")).upper(),
+                quarter_end=qe,
+                basis=basis,
+                audited=_text(r.get("audited")) or None,
+                xbrl_url=url,
+                filed_at=parse_datetime(_text(r.get("broadcast_Date")))
+                or parse_datetime(_text(r.get("creation_Date"))),
+                revision=_text(r.get("type_Sub")).lower() == "revision",
+                seq_id=_text(r.get("seq_Id")),
+                taxonomy=taxonomy,
+            )
+        )
+    return sorted(
+        out,
+        key=lambda f: (f.quarter_end, f.filed_at or datetime.min.replace(tzinfo=IST)),
+        reverse=True,
+    )
+
+
+def pick_filing(
+    filings: Sequence[IntegratedFiling], quarter_end: date, basis: str
+) -> IntegratedFiling | None:
+    """The latest filing (a revision beats the original) for one quarter and basis."""
+    for f in filings:  # newest first
+        if f.quarter_end == quarter_end and f.basis == basis:
+            return f
+    return None
+
+
 # --- client ----------------------------------------------------------------------------
 
 
@@ -458,6 +529,16 @@ class NseClient:
     def delivery_file(self, day: date) -> str | None:
         """None on holidays and before the file is published (about 18:00 IST)."""
         r = self._get(False, f"{ARCHIVES}/products/content/sec_bhavdata_full_{day:%d%m%Y}.csv")
+        return None if r is None else str(r.text)
+
+    def integrated_filings(self, symbol: str) -> Any:
+        return self._json("integrated-filing-results", index="equities", symbol=symbol)
+
+    def fetch_text(self, url: str) -> str | None:
+        """A file from NSE's archives (XBRL, CSV); None when it is not there."""
+        if not url.startswith(ARCHIVES + "/"):
+            raise NseError(f"refusing to fetch outside NSE archives: {url}")
+        r = self._get(False, url)
         return None if r is None else str(r.text)
 
     def index_closes(self, day: date) -> str | None:

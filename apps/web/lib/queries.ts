@@ -1,5 +1,6 @@
 // Every query the app runs. Tiers come from the brief() SQL function, which follows the
 // worker's scoring rules; this file only reads.
+import type { ResultsCardData } from "@/components/ResultsCard";
 import { query } from "./db";
 
 export type Contributions = { category: number; size: number; reaction: number; novelty: number };
@@ -45,7 +46,7 @@ export type BriefRow = {
   last_filed_at: string | null;
   filing_count: number;
   score_breakdown: Breakdown | null;
-  enrichment: { reaction?: Reaction } | null;
+  enrichment: { reaction?: Reaction; results_card?: ResultsCardData } | null;
   attachment_url: string | null;
 };
 

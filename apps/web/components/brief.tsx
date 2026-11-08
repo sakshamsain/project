@@ -1,4 +1,5 @@
 import Link from "next/link";
+import ResultsCard, { type ResultsCardData } from "@/components/ResultsCard";
 import { fmtDay, fmtMultiple, fmtPct, fmtScore, fmtWhen } from "@/lib/format";
 import { categoryLabel } from "@/lib/labels";
 import type { Breakdown, BriefRow, Reaction } from "@/lib/queries";
@@ -101,6 +102,9 @@ export function Story({ r }: { r: BriefRow }) {
         <Link href={`/event/${r.event_id}`}>{r.headline ?? "Exchange filing"}</Link>
       </h3>
       {r.why_it_matters && <p className="section-note">{r.why_it_matters}</p>}
+      {r.enrichment?.results_card && (
+        <ResultsCard card={r.enrichment.results_card} filingUrl={r.attachment_url} />
+      )}
       {reaction && <ReactionLine r={reaction} />}
       <div className="story-foot">
         {r.filing_count > 1 && <span>{r.filing_count} filings</span>}

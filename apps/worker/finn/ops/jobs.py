@@ -108,6 +108,8 @@ def run_poll(url: str, nse: Nse, at: datetime | None = None) -> dict[str, Any]:
         rows = _watched(url, "nse_announcements", partial(nse.announcements, d, d))
         with _step(url) as conn:
             out[d.isoformat()] = ingest_announcements(conn, rows).as_dict()
+    if hasattr(nse, "integrated_filings"):
+        out["results"] = run_results(url, nse, days=10, limit=4)
     return out
 
 
@@ -251,3 +253,35 @@ def run_rebuild(url: str, rescan_sessions: int = 45) -> dict[str, Any]:
         "events_written": events,
         "rescan": rescan,
     }
+
+
+def run_results(
+    url: str, nse: Any, days: int = 10, limit: int = 8, force: bool = False
+) -> dict[str, Any]:
+    """Build results cards for recent results events on held companies."""
+    from finn.push.results import (
+        build_results_card,
+        due,
+        last_quarter_end_before,
+        pending_results_events,
+        store_card,
+    )
+
+    now = now_ist()
+    with _step(url) as conn:
+        todo = [
+            e
+            for e in pending_results_events(conn, days, limit, force)
+            if force or due(e["attempted_at"], now)
+        ]
+    statuses: dict[str, int] = {}
+    for e in todo:
+        quarter = last_quarter_end_before(e["first_seen_at"].astimezone(IST).date())
+        try:
+            card = build_results_card(nse, str(e["symbol"]), quarter)
+        except Exception as exc:  # one company's bad file must not stop the rest
+            card = {"status": "error", "reason": f"{type(exc).__name__}: {exc}"[:300]}
+        with _step(url) as conn:
+            store_card(conn, str(e["isin"]), int(e["id"]), card)
+        statuses[card["status"]] = statuses.get(card["status"], 0) + 1
+    return {"tried": len(todo), "statuses": statuses}
