@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ReactionLine, Ticker, Why } from "@/components/brief";
+import PeopleCard from "@/components/PeopleCard";
 import ResultsCard from "@/components/ResultsCard";
 import { fmtDay, fmtMultiple, fmtPct, fmtWhen } from "@/lib/format";
 import { ANOMALY, categoryLabel } from "@/lib/labels";
@@ -40,6 +41,7 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
         {e.enrichment?.results_card && (
           <ResultsCard card={e.enrichment.results_card} filingUrl={filings[0]?.attachment_url} />
         )}
+        {e.enrichment?.people_card && <PeopleCard card={e.enrichment.people_card} />}
         {reaction && <ReactionLine r={reaction} />}
         <Why b={e.score_breakdown} category={e.category} stage={e.stage} />
       </article>

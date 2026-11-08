@@ -337,7 +337,7 @@ def run_people(url: str, nse: Any, llm: Any, days: int = 30, limit: int = 6) -> 
         pending_people_events,
     )
     from finn.push.results import due
-    from finn.sources.pdf import pdf_text
+    from finn.sources.pdf import NotAPdf, pdf_text
 
     now = now_ist()
     with _step(url) as conn:
@@ -352,7 +352,10 @@ def run_people(url: str, nse: Any, llm: Any, days: int = 30, limit: int = 6) -> 
                 data = nse.fetch_bytes(u)
                 if data is None:
                     continue
-                text = pdf_text(data)
+                try:
+                    text = pdf_text(data)
+                except NotAPdf:
+                    continue
                 if text.scanned:
                     status = "scanned"
                     continue

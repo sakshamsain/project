@@ -14,6 +14,24 @@ function keyBytes(base64url: string): Uint8Array<ArrayBuffer> {
 
 export default function PushToggle({ vapidKey }: { vapidKey: string }) {
   const [state, setState] = useState<State>("checking");
+  const [testNote, setTestNote] = useState<string | null>(null);
+
+  async function sendTest() {
+    setTestNote("Sending.");
+    try {
+      const res = await fetch("/api/push/test", { method: "POST" });
+      const body = (await res.json().catch(() => ({}))) as { error?: string; replayed?: boolean };
+      setTestNote(
+        res.ok
+          ? body.replayed
+            ? "Sent: it replays the latest front-page filing. It should arrive within a few seconds."
+            : "Sent. It should arrive within a few seconds."
+          : (body.error ?? "Could not send the test."),
+      );
+    } catch {
+      setTestNote("Could not send the test.");
+    }
+  }
 
   useEffect(() => {
     const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
@@ -97,10 +115,20 @@ export default function PushToggle({ vapidKey }: { vapidKey: string }) {
           Turn on notifications
         </button>
       ) : state === "on" ? (
-        <button className="button ghost" type="button" onClick={turnOff}>
-          Turn off notifications
-        </button>
+        <div className="row-form" style={{ flexWrap: "wrap" }}>
+          <button className="button" type="button" onClick={sendTest}>
+            Send a test notification
+          </button>
+          <button className="button ghost" type="button" onClick={turnOff}>
+            Turn off notifications
+          </button>
+        </div>
       ) : null}
+      {testNote && (
+        <p className="section-note" style={{ margin: "0.6rem 0 0" }} aria-live="polite">
+          {testNote}
+        </p>
+      )}
     </div>
   );
 }

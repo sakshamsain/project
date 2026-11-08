@@ -768,3 +768,61 @@ input[type="number"] {
 .nse-summary p {
   margin: 0.3rem 0 0;
 }
+
+/* ---------- people card ---------- */
+
+.people {
+  margin: 0.6rem 0 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-panel);
+  padding: 0.75rem 0.85rem 0.6rem;
+}
+
+.person + .person {
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--rule);
+}
+
+.person-head {
+  margin: 0;
+  font-weight: 600;
+}
+
+.person-change {
+  color: var(--stamp);
+}
+
+.person-role {
+  display: block;
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.quotes {
+  margin: 0.45rem 0 0;
+  padding-left: 1rem;
+  font-size: 0.9rem;
+}
+
+.quotes li {
+  margin: 0.25rem 0;
+}
+
+.quotes q {
+  quotes: "\201C" "\201D";
+}
+
+.cite {
+  font-size: 0.75rem;
+  color: var(--stamp);
+  white-space: nowrap;
+}
+
+.person-link {
+  display: inline-block;
+  margin-top: 0.4rem;
+  font-size: 0.8125rem;
+}

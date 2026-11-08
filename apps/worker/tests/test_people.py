@@ -61,3 +61,20 @@ def test_cards_merge_by_name() -> None:
     merged = merge_cards([card, card])
     assert merged["status"] == "ok"
     assert len(merged["people"]) == len(card["people"]) == 2
+
+
+def test_zipped_pdf_is_unwrapped_and_other_files_refused() -> None:
+    import io
+    import zipfile
+
+    import pytest
+
+    from finn.sources.pdf import NotAPdf, unwrap
+
+    raw = MUTHOOT_PDF.read_bytes()
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("filing.pdf", raw)
+    assert unwrap(buf.getvalue()) == raw
+    with pytest.raises(NotAPdf):
+        unwrap(b"<html>not found</html>")

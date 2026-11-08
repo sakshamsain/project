@@ -39,8 +39,31 @@ def clean_page(text: str) -> str:
     return s.strip()
 
 
+class NotAPdf(ValueError):
+    pass
+
+
+def unwrap(data: bytes) -> bytes:
+    """Exchange attachments are PDFs, or zips holding one; anything else is refused."""
+    if data[:5] == b"%PDF-":
+        return data
+    if data[:2] == b"PK":
+        import io
+        import zipfile
+
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            names = sorted(n for n in z.namelist() if n.lower().endswith(".pdf"))
+            if names:
+                inner = z.read(names[0])
+                if inner[:5] == b"%PDF-":
+                    return inner
+    raise NotAPdf(f"attachment is not a PDF (starts {data[:8]!r})")
+
+
 def pdf_text(data: bytes, max_pages: int = 600) -> PdfText:
     import pymupdf
+
+    data = unwrap(data)
 
     with pymupdf.open(stream=data, filetype="pdf") as doc:  # type: ignore[no-untyped-call]
         pages = [clean_page(doc[i].get_text("text")) for i in range(min(len(doc), max_pages))]

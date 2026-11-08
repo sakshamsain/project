@@ -1,24 +1,7 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { ownProfile } from "@/lib/profile";
-
-// Only real push services: the worker posts to these endpoints, so anything else is refused.
-const PUSH_HOSTS = [
-  /(^|\.)fcm\.googleapis\.com$/,
-  /(^|\.)push\.services\.mozilla\.com$/,
-  /(^|\.)push\.apple\.com$/,
-  /(^|\.)notify\.windows\.com$/,
-];
-
-function validEndpoint(endpoint: unknown): endpoint is string {
-  if (typeof endpoint !== "string" || endpoint.length > 1000) return false;
-  try {
-    const u = new URL(endpoint);
-    return u.protocol === "https:" && PUSH_HOSTS.some((re) => re.test(u.hostname));
-  } catch {
-    return false;
-  }
-}
+import { validEndpoint } from "@/lib/push";
 
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as

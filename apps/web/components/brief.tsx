@@ -1,5 +1,6 @@
 import Link from "next/link";
-import ResultsCard, { type ResultsCardData } from "@/components/ResultsCard";
+import PeopleCard from "@/components/PeopleCard";
+import ResultsCard from "@/components/ResultsCard";
 import { fmtDay, fmtMultiple, fmtPct, fmtScore, fmtWhen } from "@/lib/format";
 import { categoryLabel } from "@/lib/labels";
 import type { Breakdown, BriefRow, Reaction } from "@/lib/queries";
@@ -105,6 +106,7 @@ export function Story({ r }: { r: BriefRow }) {
       {r.enrichment?.results_card && (
         <ResultsCard card={r.enrichment.results_card} filingUrl={r.attachment_url} />
       )}
+      {r.enrichment?.people_card && <PeopleCard card={r.enrichment.people_card} compact />}
       {reaction && <ReactionLine r={reaction} />}
       <div className="story-foot">
         {r.filing_count > 1 && <span>{r.filing_count} filings</span>}
