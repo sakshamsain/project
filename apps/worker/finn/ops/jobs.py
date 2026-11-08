@@ -231,7 +231,7 @@ def run_rescan(url: str, sessions: int = 40, end: date | None = None) -> dict[st
     return totals
 
 
-def run_rebuild(url: str, rescan_sessions: int = 45) -> dict[str, Any]:
+def run_rebuild(url: str, rescan_sessions: int = 45, nse: Any = None) -> dict[str, Any]:
     """Re-read every filing with the current rules, rebuild events, then restore anomaly
     links and reactions. Safe to run while polls are paused by the advisory lock."""
     from finn.push.rebuild import detach_all, filing_days, reclassify, recluster_day
@@ -246,12 +246,14 @@ def run_rebuild(url: str, rescan_sessions: int = 45) -> dict[str, Any]:
         with _step(url) as conn:
             events += recluster_day(conn, d)
     rescan = run_rescan(url, rescan_sessions)
+    cards = run_results(url, nse, days=90, limit=200, force=True) if nse is not None else None
     return {
         "reclassified": changed,
         "events_dropped": dropped,
         "days": len(days),
         "events_written": events,
         "rescan": rescan,
+        "results_cards": cards,
     }
 
 

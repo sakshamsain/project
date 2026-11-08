@@ -174,3 +174,31 @@ def test_results_headline_from_the_card_when_there_is_no_release() -> None:
     d.results_card = card
     assert build(d).headline.startswith("Q2 FY27: revenue")
     assert results_headline({"status": "needs_a_look"}) is None
+
+
+def test_a_release_title_without_figures_gives_way_to_the_card() -> None:
+    card = {
+        "status": "ok",
+        "period": "Q2 FY27",
+        "rows": [
+            {"name": "Revenue", "value": 9898.9, "qoq_pct": 20.6, "yoy_pct": 52.8},
+            {"name": "PAT", "value": 990.0, "qoq_pct": 24.3, "yoy_pct": 42.9},
+        ],
+    }
+    vague = FilingFacts(
+        key="pr",
+        isin="INE245A01021",
+        filed_at=T0,
+        subject="Press Release",
+        text="X has informed the Exchange regarding Press release on financial results for the "
+        "quarter ended September 30, 2026",
+        summary=None,
+        category="results",
+        attributes={"stage": "press_release"},
+    )
+    d = assign([vague], [])[0]
+    d.results_card = card
+    assert (
+        build(d).headline
+        == "Q2 FY27: revenue \u20b99,899 Cr, +52.8% YoY; PAT \u20b9990 Cr, +42.9% YoY"
+    )

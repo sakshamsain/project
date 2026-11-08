@@ -271,12 +271,21 @@ def results_headline(card: Mapping[str, Any]) -> str | None:
     return f"{card.get('period', 'Results')}: {part(label, top)}; {part('PAT', pat)}"
 
 
+_FIGURE = re.compile(
+    r"(?:\u20b9|\brs\.?|\binr)\s*[\d,.]+|\d[\d,.]*\s*(?:%|crores?\b|cr\b|lakhs?\b|mn\b|"
+    r"million|billion|bn\b)",
+    re.I,
+)
+
+
 def _headline(draft: EventDraft, lead: FilingFacts) -> str:
-    if draft.family == "results" and not _is_release(lead) and draft.results_card:
-        from_card = results_headline(draft.results_card)
-        if from_card:
-            return from_card
-    return headline_for(lead.subject, lead.text, lead.summary)
+    """A release title with a figure in it wins; otherwise a results event leads with the
+    numbers computed from its card; otherwise the exchange's own description."""
+    own = headline_for(lead.subject, lead.text, lead.summary)
+    release_with_figures = _is_release(lead) and bool(_FIGURE.search(own))
+    if draft.family == "results" and draft.results_card and not release_with_figures:
+        return results_headline(draft.results_card) or own
+    return own
 
 
 def _opt_float(v: Any) -> float | None:

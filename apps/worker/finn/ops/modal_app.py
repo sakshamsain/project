@@ -135,7 +135,7 @@ def rebuild(rescan_sessions: int = 45) -> dict[str, Any]:
     """Replay stored filings through the current rules and clustering."""
     from finn.ops.jobs import run_rebuild
 
-    return _log("rebuild", run_rebuild(_setup(), rescan_sessions))
+    return _log("rebuild", run_rebuild(_setup(), rescan_sessions, nse=_client()))
 
 
 @app.function(image=image, secrets=secrets, timeout=3600)
