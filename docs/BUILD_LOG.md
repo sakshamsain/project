@@ -34,3 +34,23 @@ Three lines a day: what was asked, what went wrong, what changed.
   Day-0 spike ran on Modal (egress 20.86.121.224): NSE RSS (66 items), NSE announcements
   API (2,485 Tata Power filings), the 6 Nov bhavcopy and delivery files, Screener and
   Yahoo all answered; BSE did not. Pinned model tiers from live calls.
+
+## Sun 8 Nov 2026 (Day 0, evening): real data in, Brief live
+
+- **Asked:** build as much as possible today.
+- **Went wrong:** sourcing the env file in bash broke on the `&` in the Neon URL and the
+  shell's job notice echoed the URL into my session log (not into git or any service);
+  added `finn.ops.envrun`, which reads the file as data. Modal's local-source mount skips
+  non-Python files by default, which would have dropped `rules.yaml`; overrode the filter.
+  The first Vercel project was created without a framework, so every route 404'd; pinned
+  `framework: nextjs` in `vercel.json`. Market-wide NSE rows carry no summaries (only
+  per-symbol queries do), so headlines lean on NSE's one-line descriptions.
+- **Changed:** NSE parsers for six feeds with recorded fixtures; the push pipeline (raw
+  archive, rules, clustering into events, scores, tiers) and the EOD job (bars for every
+  listed equity, anomalies, links to the explaining filing, reaction rescoring), all
+  idempotent. Deployed to Modal with schedules: filings every 5 min from 08:00 to 23:00
+  IST, overnight every 30 min, EOD from 19:10 IST on weekdays, weekly company refresh.
+  Backfilled 61 sessions of bars (164k rows) and 60 days of filings (32.6k filings) for
+  all 2,632 listed equities. Web app live on Vercel: Today (three tiers, window picker,
+  results dates), Pulse, company and event pages, portfolio editor, alert limits,
+  notification opt-in. 144 worker tests, including database tests on Postgres.

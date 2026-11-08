@@ -57,3 +57,27 @@ candidates to re-test.
 `finn.core.migrate` applies each file once inside a transaction, records a checksum and
 refuses edited files. It talks to Neon over HTTPS, so it works where raw TCP to Postgres
 is blocked; CI applies the same files with psql against pgvector.
+
+## 012 · psycopg on the worker, HTTPS on the web
+The worker runs on Modal, which can open TCP to Neon, so it uses psycopg against Neon's
+direct endpoint (prepared statements off, COPY for bulk upserts). The web app reads over
+Neon's HTTPS driver with a separate role, `finn_web`, that can read everything but write
+only profiles, holdings, alert rules, push subscriptions and feedback. Database tests run
+on a real Postgres with pgvector, locally and in CI, from the same migration files.
+
+## 013 · Anomalies stored at floor limits, filtered per profile
+The EOD job stores every hit at or above fixed floors (1.5x volume, 3% price, 2.0 sigma,
+1.3x delivery). Each profile's own limits, at or above the floors, filter at read time,
+so changing a setting never needs a recompute.
+
+## 014 · Events are rebuilt, not patched
+When rules or clustering change, `rebuild` re-reads every rules-classified filing,
+drops all events and replays the filings day by day through the live code path, then the
+EOD rescan restores anomaly links and price reactions. A test checks that a replay
+reproduces live clustering exactly. Model and human labels are never overwritten.
+
+## 015 · Headlines from the exchange's own words first
+NSE describes each attachment in one sentence and sometimes summarises it. Stripping the
+"has informed the Exchange regarding" frame gives a usable headline for most filings, and
+a results press release lends its title (which leads with the numbers) to its results
+event. Models will rewrite only front-page headlines, from the filing alone.

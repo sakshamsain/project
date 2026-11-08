@@ -10,6 +10,9 @@ A mobile-first financial investment agent that works like an editor with a memor
   annual reports, results and concall transcripts, centred on a **Promise Ledger** of what
   management guided against what it delivered.
 
+**Live:** https://finn-blue.vercel.app (opens on a demo portfolio of 18 NSE companies;
+add or remove one and your device gets its own copy).
+
 > Status: build week, 8–15 Nov 2026. This README grows with the build; see
 > `docs/BUILD_LOG.md` for progress.
 
@@ -22,13 +25,36 @@ A mobile-first financial investment agent that works like an editor with a memor
 | `db/migrations` | Postgres schema, shared by both runtimes |
 | `docs` | Decisions, build log, runbook |
 
-## Run the worker tests
+## Run it
 
 ```bash
+# worker: tests (database tests need a local Postgres with pgvector)
 cd apps/worker
-uv sync --group dev
-uv run pytest -q
+uv sync --group dev --extra ingest --extra db
+FINN_TEST_DATABASE_URL=postgresql:///postgres uv run pytest -q
+
+# worker: deploy schedules, backfill, replay after a rules change
+export FINN_ENV_FILE=~/.secrets/finn.env
+uv run python -m finn.ops.envrun modal deploy -m finn.ops.modal_app
+uv run python -m finn.ops.envrun modal run -m finn.ops.modal_app::backfill
+
+# web
+cd apps/web && npm install && npm run build
 ```
+
+## How the Brief is made
+
+1. Every 5 minutes the worker reads NSE's announcements for the day and archives the raw rows.
+2. Each filing is classified by `rules.yaml` (93% of real filings match a rule); the
+   rest are marked for the small model.
+3. Filings of one company and family within a window (3 days for results, 2 for board
+   changes) become one event; press releases never merge.
+4. Each event is scored: category weight, size, price reaction, novelty, with floors for
+   top-management or auditor exits, downgrades and pledge increases.
+5. `brief()` in Postgres ranks a profile's events for the chosen window: at most five on
+   the front page, the rest in brief or folded as routine.
+6. After the close, every listed stock is checked for unusual volume, price and delivery;
+   each move is tied to the filing that explains it, or flagged as unexplained.
 
 ## Design rules
 
