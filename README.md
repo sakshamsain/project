@@ -30,7 +30,7 @@ add or remove one and your device gets its own copy).
 ```bash
 # worker: tests (database tests need a local Postgres with pgvector)
 cd apps/worker
-uv sync --group dev --extra ingest --extra db
+uv sync --group dev --extra ingest --extra db --extra push --extra docs
 FINN_TEST_DATABASE_URL=postgresql:///postgres uv run pytest -q
 
 # worker: deploy schedules, backfill, replay after a rules change

@@ -17,7 +17,7 @@ a Promise Ledger of guidance against delivery). The full plan lives in the
 
 ```bash
 cd apps/worker
-uv sync --group dev --extra ingest --extra db
+uv sync --group dev --extra ingest --extra db --extra push --extra docs
 FINN_TEST_DATABASE_URL=postgresql:///postgres uv run pytest -q   # unset: DB tests skip
 uv run ruff check . && uv run ruff format --check .
 uv run mypy
