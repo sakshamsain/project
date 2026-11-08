@@ -826,3 +826,108 @@ input[type="number"] {
   margin-top: 0.4rem;
   font-size: 0.8125rem;
 }
+
+/* ---------- promise ledger ---------- */
+
+.threads {
+  display: grid;
+  gap: 1rem;
+}
+
+.thread {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-panel);
+  padding: 0.8rem 0.9rem 0.6rem;
+}
+
+.thread-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.thread-head h3 {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.thread-period {
+  display: inline-block;
+  margin-left: 0.45rem;
+  font-weight: 500;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.thread-check {
+  margin: 0.35rem 0 0.4rem;
+  font-size: 0.9375rem;
+}
+
+.chip {
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+
+.chip.delivered,
+.chip.on_track {
+  color: var(--up);
+}
+
+.chip.missed,
+.chip.off_track {
+  color: var(--down);
+}
+
+.chip.too_early,
+.chip.not_measurable {
+  color: var(--muted);
+}
+
+.said {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  font-size: 0.9rem;
+}
+
+.said li {
+  padding: 0.45rem 0;
+  border-top: 1px solid var(--rule);
+}
+
+.said-when {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--faint);
+}
+
+.said q {
+  quotes: "\201C" "\201D";
+}
+
+.rev {
+  font-weight: 600;
+}
+
+.rev.raised {
+  color: var(--up);
+}
+
+.rev.cut {
+  color: var(--down);
+}
+
+.rev.kept,
+.rev.changed {
+  color: var(--muted);
+}

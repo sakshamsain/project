@@ -4,6 +4,7 @@ import { fmtDay, fmtPct, fmtPrice, fmtWhen } from "@/lib/format";
 import { categoryLabel } from "@/lib/labels";
 import { currentProfile } from "@/lib/profile";
 import { getCompany } from "@/lib/queries";
+import { hasLedger } from "@/lib/research";
 import { addHolding, removeHolding } from "../../settings/actions";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +32,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ symbol
   const data = await getCompany(decodeURIComponent(symbol), profile.id);
   if (!data) notFound();
   const { company: c, bars, events, meetings, held } = data;
+  const ledger = await hasLedger(c.isin);
   const last = bars.at(-1);
   const ret = last?.prev_close ? (last.close / last.prev_close - 1) * 100 : null;
   return (
@@ -65,6 +67,11 @@ export default async function CompanyPage({ params }: { params: Promise<{ symbol
           <button className={held ? "button ghost small" : "button small"} type="submit">
             {held ? "Remove from portfolio" : "Add to portfolio"}
           </button>
+          {ledger && (
+            <Link className="button ghost small" href={`/research/${c.symbol}`} style={{ marginLeft: "0.5rem", textDecoration: "none" }}>
+              Promise ledger
+            </Link>
+          )}
         </form>
       </section>
 
