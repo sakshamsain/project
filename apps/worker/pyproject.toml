@@ -1,0 +1,49 @@
+[project]
+name = "finn-worker"
+version = "0.1.0"
+description = "FINN workers: ingestion, push pipeline and research engine"
+requires-python = ">=3.12"
+dependencies = [
+  "pydantic>=2.7",
+  "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+ingest = [
+  "httpx>=0.27",
+  "nse>=5.1",
+  "bse>=3.3",
+  "yfinance>=0.2",
+  "pandas>=2.2",
+  "lxml>=5.0",
+  "selectolax>=0.3",
+]
+docs = ["pymupdf>=1.24", "pdfplumber>=0.11", "fastembed>=0.3"]
+llm = ["litellm>=1.40"]
+db = ["psycopg[binary]>=3.2", "pgvector>=0.3"]
+deploy = ["modal>=0.64"]
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10", "types-PyYAML"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["finn"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["finn"]

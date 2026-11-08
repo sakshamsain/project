@@ -1,0 +1,28 @@
+# Secrets: never commit. Real values live in Modal/Vercel secret stores.
+.env
+.env.*
+!.env.example
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+.next/
+out/
+.vercel/
+*.tsbuildinfo
+
+# Data and local artefacts
+/data/
+*.sqlite
+.DS_Store

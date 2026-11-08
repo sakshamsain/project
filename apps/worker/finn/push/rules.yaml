@@ -1,0 +1,197 @@
+# Rules-first filing classifier, v0.
+#
+# Written before seeing real filings. On the first build day, pull 30 days of
+# portfolio filings, count subject strings, and tune these against that sample.
+#
+# Order matters: the first matching rule wins. `any` holds case-insensitive regexes
+# matched against "subject + exchange category + the first 600 characters of text".
+# A filing that matches nothing goes to the small model.
+
+- id: trading_window
+  category: unclassified
+  attributes: {kind: trading_window}
+  any: ['trading window']
+
+- id: auditor_resignation
+  category: management_change
+  attributes: {role: auditor, action: resign}
+  any:
+    - 'resignation of (the )?(joint )?(statutory )?auditors?'
+    - 'auditors? ha(s|ve) resigned'
+
+- id: results_intimation
+  category: results
+  attributes: {stage: intimation}
+  any:
+    - 'intimation of (the )?board meeting'
+    - 'notice of (the )?board meeting'
+    - 'board meeting (is )?(scheduled|to be held)'
+    - 'prior intimation'
+
+- id: results_newspaper
+  category: results
+  attributes: {stage: newspaper_ad}
+  any: ['newspaper (publication|advertisement|ad)s?.{0,80}results']
+
+- id: transcript
+  category: earnings_call
+  attributes: {stage: transcript}
+  any: ['transcript']
+
+- id: call_recording
+  category: earnings_call
+  attributes: {stage: recording}
+  any: ['audio recording', 'video recording', 'recording of the (earnings|conference) call']
+
+- id: call_notice
+  category: earnings_call
+  attributes: {stage: notice}
+  any:
+    - '(earnings|conference) call (on|with|to discuss|scheduled)'
+    - 'intimation of (earnings|conference) call'
+
+- id: investor_meet
+  category: investor_meetings
+  any:
+    - 'analysts?\s*/\s*institutional investor meet'
+    - 'investor meet'
+    - 'one[- ]on[- ]one meeting'
+    - 'investor conference'
+    - 'schedule of (analyst|investor)'
+
+- id: results_filing
+  category: results
+  attributes: {stage: filing}
+  any:
+    - 'financial results? for the (quarter|half[- ]year|year|period|nine months)'
+    - '(un)?audited (standalone|consolidated)?\s*(and (standalone|consolidated)\s*)?financial results'
+    - 'integrated filing.{0,20}financial'
+    - 'financial result updates'
+
+- id: credit_rating
+  category: credit_rating
+  any:
+    - 'credit rating'
+    - 'rating (action|rationale|reaffirmed|upgrade|downgrade)'
+    - '\b(crisil|icra|care ratings|india ratings|acuite|infomerics|brickwork)\b'
+
+- id: kmp_change
+  category: management_change
+  any:
+    - 'change in (directors?|key managerial personnel|kmp|management|senior management)'
+    - 'appointment of (mr\.?|ms\.?|mrs\.?|dr\.? )?.{0,60}(chief|managing director|whole[- ]time|executive director|independent director|additional director|company secretary|compliance officer)'
+    - 'resignation of (mr\.?|ms\.?|mrs\.?|dr\.? )?.{0,60}(chief|managing director|director|cfo|ceo|company secretary|compliance officer)'
+    - 'cessation of'
+    - 're-?appointment of'
+
+- id: pledge
+  category: pledging
+  any: ['encumbrance', '\bpledge', 'regulation 31\s*\(1\)']
+
+- id: insider
+  category: insider_trading
+  any:
+    - 'regulation 7\s*\(2\)'
+    - 'prohibition of insider trading'
+    - 'regulation 29\s*\(\d\)'
+    - 'substantial acquisition'
+
+- id: buyback
+  category: fund_raise
+  attributes: {kind: buyback}
+  any: ['buy-?back']
+
+- id: esop_allotment
+  category: unclassified
+  attributes: {kind: esop}
+  any: ['\besop\b', '\besos\b', 'employee stock option', 'employees? stock (purchase|option)']
+
+- id: fund_raise
+  category: fund_raise
+  any:
+    - 'qualified institutions? placement'
+    - '\bqip\b'
+    - 'rights issue'
+    - 'preferential (issue|allotment)'
+    - 'commercial paper'
+    - 'non[- ]convertible debentures'
+    - '\bncds?\b'
+    - '(raising|raise) of funds'
+    - 'fund[- ]?raising'
+
+- id: bonus_split
+  category: bonus_split
+  any: ['bonus (issue|shares)', 'sub-?division', 'stock split', 'split of (the )?(equity )?shares']
+
+- id: dividend
+  category: dividend
+  any: ['\bdividend']
+
+- id: m_and_a
+  category: M&A
+  any:
+    - '\bacquisition\b'
+    - 'amalgamation'
+    - '\bmerger\b'
+    - 'demerger'
+    - 'scheme of arrangement'
+    - 'joint venture'
+    - 'investment in (a |its )?(wholly[- ]owned )?subsidiary'
+    - 'stake (sale|purchase)'
+    - 'divest'
+
+- id: capex
+  category: capex
+  any:
+    - 'capital expenditure'
+    - '\bcapex\b'
+    - 'capacity expansion'
+    - 'new (plant|facility|manufacturing unit)'
+    - 'commissioning of'
+    - 'commercial production'
+
+- id: litigation
+  category: litigation
+  any:
+    - 'litigation'
+    - 'show cause notice'
+    - '\bpenalty\b'
+    - 'order (passed|received) (by|from)'
+    - 'insolvency'
+    - '\bnclt\b'
+    - 'tax demand'
+    - 'warning letter'
+    - 'search and seizure'
+
+- id: agm_egm
+  category: agm_egm
+  any: ['annual general meeting', '\bagm\b', 'extra-?ordinary general meeting', '\begm\b']
+
+- id: postal_ballot
+  category: postal_ballot
+  any: ['postal ballot']
+
+- id: routine
+  category: unclassified
+  any:
+    - 'compliance certificate'
+    - 'regulation 74\s*\(5\)'
+    - '(loss|duplicate) (of )?share certificate'
+    - 'investor complaints'
+    - 'secretarial compliance'
+    - 'business responsibility'
+    - 'closure of (the )?register'
+    - 'registrar and (share )?transfer agent'
+    - 'newspaper (publication|advertisement)'
+
+- id: press_release
+  category: press_release
+  confidence: 0.7
+  any:
+    - 'press release'
+    - 'media release'
+    - '(bags?|wins?|received|secures?) (an? )?(new )?orders?'
+    - 'order (win|inflow)'
+    - 'launch'
+    - 'partnership'
+    - 'clarification'
