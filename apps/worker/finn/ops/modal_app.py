@@ -201,6 +201,18 @@ def request_research(body: dict[str, Any]) -> dict[str, Any]:
     return {"started": job_id}
 
 
+@app.function(image=image, secrets=secrets, timeout=3 * 3600)
+def history() -> dict[str, Any]:
+    """A year of prices and ten quarters of figures for tracked companies."""
+    from finn.ops.jobs import run_financials, run_price_history
+
+    url = _setup()
+    nse = _client()
+    return _log(
+        "history", {"prices": run_price_history(url, nse), "financials": run_financials(url, nse)}
+    )
+
+
 @app.function(image=image, secrets=secrets, timeout=120)
 def env_check() -> dict[str, Any]:
     """Which expected settings are present (names only, never values)."""

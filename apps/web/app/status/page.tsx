@@ -1,5 +1,7 @@
 import Link from "next/link";
+import Masthead from "@/components/Masthead";
 import { fmtWhen } from "@/lib/format";
+import { sessionUser } from "@/lib/profile";
 import { getStatus } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
@@ -16,15 +18,10 @@ const SOURCE: Record<string, string> = {
 };
 
 export default async function Status() {
-  const { sources, counts } = await getStatus();
+  const [{ sources, counts }, user] = await Promise.all([getStatus(), sessionUser()]);
   return (
     <main className="page">
-      <header className="masthead">
-        <Link className="wordmark" href="/">
-          FINN
-        </Link>
-        <span className="dateline">Data sources</span>
-      </header>
+      <Masthead user={user} note="Data sources" />
       <section className="section" style={{ marginTop: "1.5rem" }}>
         <h2 className="section-title">Freshness</h2>
         <ul className="lines">

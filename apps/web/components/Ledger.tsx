@@ -1,3 +1,4 @@
+import RangeCheck from "@/components/charts/RangeCheck";
 import { fmtDay } from "@/lib/format";
 import type { LedgerStatus, Promise_ } from "@/lib/research";
 
@@ -126,6 +127,17 @@ export function ThreadCard({ t }: { t: Thread }) {
           latest.actual_note
         )}
       </p>
+      {latest.actual_value != null &&
+        ["delivered", "missed", "on_track", "off_track"].includes(latest.status) &&
+        (latest.value_low != null || latest.value_high != null) && (
+          <RangeCheck
+            low={latest.value_low}
+            high={latest.value_high}
+            actual={latest.actual_value}
+            unit={latest.unit}
+            label={`${title(latest)}${latest.period_label ? `, ${latest.period_label}` : ""}`}
+          />
+        )}
       <ol className="said">
         {t.items.map((p, i) => {
           const rev = revision(p, t.items[i + 1]);

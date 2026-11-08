@@ -379,3 +379,65 @@ def run_people(url: str, nse: Any, llm: Any, days: int = 30, limit: int = 6) -> 
         st = str(card["status"])
         statuses[st] = statuses.get(st, 0) + 1
     return {"tried": len(todo), "statuses": statuses}
+
+
+def tracked_companies(url: str) -> list[dict[str, Any]]:
+    """Companies someone follows: any profile's holdings, and every company with a ledger."""
+    with _step(url) as conn:
+        return fetch_all(
+            conn,
+            "select distinct a.isin, a.value as symbol from company_aliases a"
+            " where a.kind = 'nse_symbol' and a.valid_to is null and a.isin in ("
+            "   select isin from holdings union"
+            "   select isin from dossier_sections where section = 'ledger')",
+        )
+
+
+def run_price_history(url: str, nse: Nse, days: int = 370) -> dict[str, Any]:
+    """A year of daily bars for tracked companies, for the charts. Sessions already on
+    file for every tracked company are skipped, so re-running only fills gaps."""
+    tracked = {str(r["isin"]) for r in tracked_companies(url)}
+    end = now_ist().date()
+    with _step(url) as conn:
+        have = {
+            r["trade_date"]
+            for r in fetch_all(
+                conn,
+                "select trade_date from eod_prices where isin = any(%s)"
+                " group by trade_date having count(*) >= %s",
+                [sorted(tracked), max(1, int(len(tracked) * 0.8))],
+            )
+        }
+    stored = sessions = 0
+    for d in trading_days_back(end, days * 5 // 7):
+        if d in have:
+            continue
+        text = nse.delivery_file(d)
+        if text is None:
+            continue
+        with _step(url) as conn:
+            isin_of = eod.isins_for(conn, (b.symbol for b in parse_delivery_file(text)))
+            bars = [b for b in parse_delivery_file(text) if isin_of.get(b.symbol) in tracked]
+            stored += eod.store_bars(conn, bars)
+            idx = nse.index_closes(d)
+            if idx:
+                eod.store_index(conn, parse_index_closes(idx))
+        sessions += 1
+    return {"tracked": len(tracked), "sessions_added": sessions, "bars": stored}
+
+
+def run_financials(url: str, nse: Any) -> dict[str, Any]:
+    """Up to ten quarters of XBRL figures for every tracked company."""
+    from finn.pull.financials import quarterly_results, store_quarters
+
+    done: dict[str, int] = {}
+    for r in tracked_companies(url):
+        try:
+            basis, series = quarterly_results(nse, str(r["symbol"]), quarters=10)
+        except Exception as exc:  # one company's bad file must not stop the rest
+            log.warning("financials %s: %s", r["symbol"], exc)
+            continue
+        if basis:
+            with _step(url) as conn:
+                done[str(r["symbol"])] = store_quarters(conn, str(r["isin"]), basis, series)
+    return {"companies": len(done), "quarters": sum(done.values())}

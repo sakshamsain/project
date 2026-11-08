@@ -1,5 +1,7 @@
 import Link from "next/link";
+import Masthead from "@/components/Masthead";
 import { STATUS } from "@/components/Ledger";
+import { sessionUser } from "@/lib/profile";
 import { listLedgers, type LedgerStatus } from "@/lib/research";
 import { requestLedger } from "./actions";
 
@@ -20,15 +22,10 @@ export default async function Research({
   searchParams: Promise<{ error?: string; q?: string }>;
 }) {
   const { error, q } = await searchParams;
-  const ledgers = await listLedgers();
+  const [ledgers, user] = await Promise.all([listLedgers(), sessionUser()]);
   return (
     <main className="page">
-      <header className="masthead">
-        <Link className="wordmark" href="/">
-          FINN
-        </Link>
-        <span className="dateline">Research</span>
-      </header>
+      <Masthead user={user} note="Research" />
       <section className="triage">
         <p className="triage-line" style={{ fontSize: "clamp(1.9rem, 8vw, 2.6rem)" }}>
           What management promised,

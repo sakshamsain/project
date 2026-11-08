@@ -1,6 +1,9 @@
 import Link from "next/link";
+import Masthead from "@/components/Masthead";
 import { notFound } from "next/navigation";
 import { fmtDay, fmtPct, fmtPrice, fmtWhen } from "@/lib/format";
+import PriceChart from "@/components/charts/PriceChart";
+import QuarterChart, { type QuarterPoint } from "@/components/charts/QuarterChart";
 import { categoryLabel } from "@/lib/labels";
 import { currentProfile } from "@/lib/profile";
 import { getCompany } from "@/lib/queries";
@@ -9,19 +12,16 @@ import { addHolding, removeHolding } from "../../settings/actions";
 
 export const dynamic = "force-dynamic";
 
-function Spark({ closes }: { closes: number[] }) {
-  if (closes.length < 2) return null;
-  const min = Math.min(...closes);
-  const max = Math.max(...closes);
-  const span = max - min || 1;
-  const pts = closes
-    .map((c, i) => `${((i / (closes.length - 1)) * 100).toFixed(2)},${(36 - ((c - min) / span) * 32).toFixed(2)}`)
-    .join(" ");
-  return (
-    <svg className="spark" viewBox="0 0 100 40" preserveAspectRatio="none" role="img" aria-label={`Closing prices, last ${closes.length} sessions`}>
-      <polyline points={pts} fill="none" stroke="currentColor" strokeWidth="1.4" vectorEffect="non-scaling-stroke" />
-    </svg>
-  );
+function series(rows: { period: string; metric: string; value: number }[], metric: string): QuarterPoint[] {
+  return rows
+    .filter((r) => r.metric === metric)
+    .map((r) => {
+      const m = /^Q([1-4])FY(\d{2})$/.exec(r.period);
+      return m ? { label: `Q${m[1]} FY${m[2]}`, q: Number(m[1]), fy: Number(m[2]), value: r.value } : null;
+    })
+    .filter((p): p is QuarterPoint => p !== null)
+    .sort((a, b) => a.fy - b.fy || a.q - b.q)
+    .slice(-8);
 }
 
 const TIER: Record<string, string> = { front: "Read first", oneliner: "In brief", folded: "Routine" };
@@ -31,18 +31,16 @@ export default async function CompanyPage({ params }: { params: Promise<{ symbol
   const profile = await currentProfile();
   const data = await getCompany(decodeURIComponent(symbol), profile.id);
   if (!data) notFound();
-  const { company: c, bars, events, meetings, held } = data;
+  const { company: c, bars, events, meetings, held, marks, quarters } = data;
+  const lender = quarters.some((q) => q.metric === "nii");
+  const top = series(quarters, lender ? "nii" : "revenue");
+  const pat = series(quarters, "pat");
   const ledger = await hasLedger(c.isin);
   const last = bars.at(-1);
   const ret = last?.prev_close ? (last.close / last.prev_close - 1) * 100 : null;
   return (
     <main className="page">
-      <header className="masthead">
-        <Link className="wordmark" href="/">
-          FINN
-        </Link>
-        <span className="dateline">{c.industry ?? ""}</span>
-      </header>
+      <Masthead user={profile.user} note={c.industry ?? ""} />
 
       <section className="triage" aria-label="Company">
         <span className="stamp">{c.symbol}</span>
@@ -59,7 +57,19 @@ export default async function CompanyPage({ params }: { params: Promise<{ symbol
             )}
           </p>
         )}
-        <Spark closes={bars.map((b) => b.close)} />
+        {bars.length > 1 && (
+          <PriceChart
+            symbol={c.symbol}
+            bars={bars.map((b) => ({ d: b.trade_date, close: b.close, volume: b.volume }))}
+            events={marks.map((m) => ({
+              d: m.d,
+              id: m.id,
+              headline: m.headline ?? "Exchange filing",
+              tier: m.tier,
+              label: categoryLabel(m.category, m.stage),
+            }))}
+          />
+        )}
         <form action={held ? removeHolding : addHolding} style={{ marginTop: "0.75rem" }}>
           <input type="hidden" name="isin" value={c.isin} />
           <input type="hidden" name="symbol" value={c.symbol} />
@@ -74,6 +84,22 @@ export default async function CompanyPage({ params }: { params: Promise<{ symbol
           )}
         </form>
       </section>
+
+      {top.length > 1 && (
+        <section className="section" aria-labelledby="quarters">
+          <h2 className="section-title" id="quarters">
+            Quarterly results
+          </h2>
+          <div className="qcharts">
+            <QuarterChart title={lender ? "Net interest income" : "Revenue"} points={top} />
+            {pat.length > 1 && <QuarterChart title="Net profit" points={pat} />}
+          </div>
+          <p className="section-note">
+            From the company&apos;s XBRL filings on NSE, {quarters[0]?.basis ?? "consolidated"}. Tap a bar for
+            its change on the quarter and the year.
+          </p>
+        </section>
+      )}
 
       {meetings.length > 0 && (
         <section className="section" aria-labelledby="meetings">
@@ -93,7 +119,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ symbol
 
       <section className="section" aria-labelledby="events">
         <h2 className="section-title" id="events">
-          Last 60 days <span className="n">{events.length}</span>
+          Filings, last 60 days <span className="n">{events.length}</span>
         </h2>
         {events.length === 0 ? (
           <p className="empty">No filings in the last 60 days.</p>

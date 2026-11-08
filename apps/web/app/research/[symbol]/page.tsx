@@ -1,8 +1,10 @@
 import Link from "next/link";
+import Masthead from "@/components/Masthead";
 import JobProgress from "@/components/JobProgress";
 import { STATUS, ThreadCard, threads } from "@/components/Ledger";
 import { fmtDay } from "@/lib/format";
 import { query } from "@/lib/db";
+import { sessionUser } from "@/lib/profile";
 import { getLedger, type LedgerStatus } from "@/lib/research";
 import { requestLedger } from "../actions";
 
@@ -20,7 +22,7 @@ export default async function LedgerPage({
   const { symbol } = await params;
   const { job } = await searchParams;
   const sym = decodeURIComponent(symbol).toUpperCase();
-  const data = await getLedger(sym);
+  const [data, user] = await Promise.all([getLedger(sym), sessionUser()]);
   const jobId = job && /^\d+$/.test(job) ? job : null;
   if (!data || jobId) {
     const [c] = await query<{ name: string }>(
@@ -31,12 +33,7 @@ export default async function LedgerPage({
     if (!data) {
       return (
         <main className="page">
-          <header className="masthead">
-            <Link className="wordmark" href="/research">
-              FINN
-            </Link>
-            <span className="dateline">Promise ledger</span>
-          </header>
+          <Masthead user={user} note="Promise ledger" />
           <section className="triage">
             <span className="stamp">{sym}</span>
             <h1 className="triage-line" style={{ fontSize: "clamp(1.8rem, 7vw, 2.5rem)", marginTop: "0.5rem" }}>
@@ -68,12 +65,7 @@ export default async function LedgerPage({
   const read = body.transcripts.filter((t) => t.status === "read");
   return (
     <main className="page">
-      <header className="masthead">
-        <Link className="wordmark" href="/research">
-          FINN
-        </Link>
-        <span className="dateline">Promise ledger</span>
-      </header>
+      <Masthead user={user} note="Promise ledger" />
 
       {jobId && <JobProgress id={jobId} />}
       <section className="triage" aria-label="Summary">

@@ -1,5 +1,7 @@
 import Link from "next/link";
+import Masthead from "@/components/Masthead";
 import PushToggle from "@/components/PushToggle";
+import SignOut from "@/components/SignOut";
 import { fmtPct, fmtPrice } from "@/lib/format";
 import { currentProfile } from "@/lib/profile";
 import { FLOORS, getHoldings, getThresholds, searchCompanies } from "@/lib/queries";
@@ -23,21 +25,48 @@ export default async function Settings({
   const held = new Set(holdings.map((h) => h.isin));
   return (
     <main className="page">
-      <header className="masthead">
-        <Link className="wordmark" href="/">
-          FINN
-        </Link>
-        <span className="dateline">Settings</span>
-      </header>
+      <Masthead user={profile.user} note="Settings" />
 
-      <section className="section" aria-labelledby="portfolio" style={{ marginTop: "1.5rem" }}>
+      <section className="section" id="account" aria-labelledby="account-title" style={{ marginTop: "1.5rem" }}>
+        <h2 className="section-title" id="account-title">
+          Account
+        </h2>
+        {profile.user ? (
+          <div className="panel account-row">
+            <div>
+              <strong>{profile.user.name}</strong>
+              <span className="line-kind">
+                {profile.user.email}. Your portfolio, alert limits and notifications follow this account.
+              </span>
+            </div>
+            <SignOut />
+          </div>
+        ) : (
+          <div className="panel">
+            <p className="section-note" style={{ margin: "0 0 0.75rem" }}>
+              Sign in to keep your portfolio, alert limits and notifications on every device. You can
+              use FINN without an account; this device then keeps its own portfolio.
+            </p>
+            <div className="row-form">
+              <Link className="button small" href="/signin?mode=signup" style={{ textDecoration: "none" }}>
+                Create account
+              </Link>
+              <Link className="button ghost small" href="/signin" style={{ textDecoration: "none" }}>
+                Sign in
+              </Link>
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section className="section" aria-labelledby="portfolio">
         <h2 className="section-title" id="portfolio">
           Your portfolio <span className="n">{holdings.length}</span>
         </h2>
         {profile.isDemo && (
           <p className="notice">
             You are looking at the demo portfolio. Add or remove a company and this device gets
-            its own copy; nothing else about you is stored.
+            its own copy; sign in to keep it on every device.
           </p>
         )}
         <form method="get" action="/settings" className="row-form" role="search" style={{ marginBottom: "0.75rem" }}>

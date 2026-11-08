@@ -45,6 +45,7 @@ export type Promise_ = {
   unit: string | null;
   period_label: string | null;
   status: LedgerStatus;
+  actual_value: number | null;
   actual_note: string | null;
   quote: string;
   speaker: string | null;
@@ -80,7 +81,8 @@ export async function getLedger(symbol: string) {
             coalesce(g.extraction ->> 'metric_key', g.metric_key) as thread_metric,
             g.kind, g.basis, g.scope, g.scope_note,
             g.value_low::float8 as value_low, g.value_high::float8 as value_high, g.unit,
-            g.period_label, g.status, g.actual_note, g.quote, g.speaker, g.page,
+            g.period_label, g.status, g.actual_value::float8 as actual_value, g.actual_note,
+            g.quote, g.speaker, g.page,
             g.call_date::text as call_date, d.source_url
        from guidance g join documents d on d.id = g.document_id
       where g.isin = $1

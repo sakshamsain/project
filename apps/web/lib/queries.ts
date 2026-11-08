@@ -288,11 +288,11 @@ export async function getCompany(symbol: string, profileId: string) {
     [symbol],
   );
   if (!c) return null;
-  const [bars, events, meetings, held] = await Promise.all([
+  const [bars, events, meetings, held, marks, quarters] = await Promise.all([
     query<{ trade_date: string; close: number; prev_close: number | null; volume: number }>(
       `select trade_date::text as trade_date, close::float8 as close,
               prev_close::float8 as prev_close, volume::float8 as volume
-         from eod_prices where isin = $1 order by trade_date desc limit 60`,
+         from eod_prices where isin = $1 order by trade_date desc limit 260`,
       [c.isin],
     ),
     query<CompanyEvent>(
@@ -309,8 +309,36 @@ export async function getCompany(symbol: string, profileId: string) {
       [c.isin],
     ),
     query("select 1 from holdings where profile_id = $1 and isin = $2", [profileId, c.isin]),
+    // A filing after the 15:30 close moves the next session, hence the 8h30m shift.
+    query<{ id: string; d: string; headline: string | null; tier: "front" | "oneliner"; category: string; stage: string | null }>(
+      `select id::text, (((first_seen_at at time zone 'Asia/Kolkata') + interval '8 hours 30 minutes')::date)::text as d,
+              headline, tier, category, stage
+         from events
+        where isin = $1 and tier in ('front', 'oneliner') and first_seen_at > now() - interval '400 days'
+        order by first_seen_at`,
+      [c.isin],
+    ),
+    query<{ period: string; metric: string; value: number; basis: string }>(
+      `with b as (
+         select case when bool_or(basis = 'consolidated') then 'consolidated' else 'standalone' end as basis
+           from financials where isin = $1 and period_type = 'Q'
+       )
+       select f.period, f.metric, f.value_cr::float8 as value, f.basis
+         from financials f, b
+        where f.isin = $1 and f.period_type = 'Q' and f.basis = b.basis
+          and f.metric in ('revenue', 'nii', 'pat')`,
+      [c.isin],
+    ),
   ]);
-  return { company: c, bars: bars.reverse(), events, meetings, held: held.length > 0 };
+  return {
+    company: c,
+    bars: bars.reverse(),
+    events,
+    meetings,
+    held: held.length > 0,
+    marks,
+    quarters,
+  };
 }
 
 // ---------- portfolio ----------

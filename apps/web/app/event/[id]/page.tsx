@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Masthead from "@/components/Masthead";
 import { notFound } from "next/navigation";
 import { ReactionLine, Ticker, Why } from "@/components/brief";
 import PeopleCard from "@/components/PeopleCard";
@@ -6,6 +7,7 @@ import ResultsCard from "@/components/ResultsCard";
 import { fmtDay, fmtMultiple, fmtPct, fmtWhen } from "@/lib/format";
 import { ANOMALY, categoryLabel } from "@/lib/labels";
 import { getEvent } from "@/lib/queries";
+import { sessionUser } from "@/lib/profile";
 import { clean } from "@/lib/text";
 
 export const dynamic = "force-dynamic";
@@ -17,15 +19,11 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
   const data = await getEvent(id);
   if (!data) notFound();
   const { event: e, filings, hits } = data;
+  const user = await sessionUser();
   const reaction = e.enrichment?.reaction;
   return (
     <main className="page">
-      <header className="masthead">
-        <Link className="wordmark" href="/">
-          FINN
-        </Link>
-        <span className="dateline">{TIER[e.tier] ?? ""}</span>
-      </header>
+      <Masthead user={user} note={TIER[e.tier] ?? ""} />
 
       <article className="section" style={{ marginTop: "1.25rem" }}>
         <div className="story-meta">

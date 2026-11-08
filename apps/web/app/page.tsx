@@ -1,6 +1,8 @@
 import Link from "next/link";
+import Masthead from "@/components/Masthead";
 import { Line, Routine, Story } from "@/components/brief";
-import { WINDOWS, fmtClock, fmtDay, fmtLongDate, parseWindow } from "@/lib/format";
+import Intro from "@/components/Intro";
+import { WINDOWS, fmtClock, fmtDay, parseWindow } from "@/lib/format";
 import { currentProfile } from "@/lib/profile";
 import { countHoldings, getBrief, getComingUp } from "@/lib/queries";
 
@@ -8,13 +10,20 @@ export const dynamic = "force-dynamic";
 
 export default async function Today({ searchParams }: { searchParams: Promise<{ w?: string }> }) {
   const { w } = await searchParams;
-  const win = parseWindow(w);
+  let win = parseWindow(w);
   const profile = await currentProfile();
-  const [rows, upcoming, holdings] = await Promise.all([
+  let [rows, upcoming, holdings] = await Promise.all([
     getBrief(profile.id, win.from, win.to),
     getComingUp(profile.id),
     countHoldings(profile.id),
   ]);
+  // A quiet day (a weekend, a holiday) widens the default window rather than show nothing.
+  let widened = false;
+  if (!w && rows.reduce((n, r) => n + r.filing_count, 0) < 3) {
+    win = parseWindow("3d");
+    rows = await getBrief(profile.id, win.from, win.to);
+    widened = true;
+  }
   const front = rows.filter((r) => r.tier === "front");
   const brief = rows.filter((r) => r.tier === "oneliner");
   const routine = rows.filter((r) => r.tier === "folded");
@@ -23,15 +32,9 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
 
   return (
     <main className="page">
-      <header className="masthead">
-        <Link className="wordmark" href="/">
-          FINN
-        </Link>
-        <span className="dateline">
-          {fmtLongDate()}, {fmtClock()} IST
-        </span>
-      </header>
+      <Masthead user={profile.user} note={`${fmtDay(new Date())}, ${fmtClock()} IST`} />
 
+      <Intro />
       <section className="triage" aria-label="Summary">
         {filings === 0 ? (
           <p className="triage-line">Nothing filed</p>
@@ -49,6 +52,7 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
           {filings === 0
             ? `None of your ${holdings} companies filed anything ${win.phrase}. Try a longer window.`
             : `From your ${holdings} companies ${win.phrase}, ranked by how much each could move the stock. Routine filings are folded at the end.`}
+          {widened && " It was a quiet day, so this shows the last 3 days."}
           {profile.isDemo && (
             <>
               {" "}

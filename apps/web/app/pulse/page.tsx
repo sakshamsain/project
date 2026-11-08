@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Masthead from "@/components/Masthead";
 import { Ticker } from "@/components/brief";
 import { fmtDay, fmtMultiple, fmtPct } from "@/lib/format";
 import { categoryLabel } from "@/lib/labels";
@@ -59,12 +60,7 @@ export default async function Pulse() {
   const { days, moves } = await getPulse(profile.id, t, 5);
   return (
     <main className="page">
-      <header className="masthead">
-        <Link className="wordmark" href="/">
-          FINN
-        </Link>
-        <span className="dateline">Pulse</span>
-      </header>
+      <Masthead user={profile.user} note="Pulse" />
 
       <section className="triage" aria-label="Summary">
         <p className="triage-line" style={{ fontSize: "clamp(1.9rem, 8vw, 2.6rem)" }}>
