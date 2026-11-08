@@ -157,6 +157,16 @@ def people(days: int = 30, limit: int = 30) -> dict[str, Any]:
     return _log("people", run_people(url, _client(), make_llm(url), days=days, limit=limit))
 
 
+@app.function(image=image, secrets=secrets, timeout=3600)
+def dossier(symbol: str, transcripts: int = 4) -> dict[str, Any]:
+    """The Promise Ledger for one company, from its last four call transcripts."""
+    from finn.ops.jobs import make_llm
+    from finn.pull.dossier import build_dossier
+
+    url = _setup()
+    return _log("dossier", build_dossier(url, _client(), make_llm(url), symbol, transcripts))
+
+
 @app.function(image=image, secrets=secrets, timeout=120)
 def env_check() -> dict[str, Any]:
     """Which expected settings are present (names only, never values)."""
