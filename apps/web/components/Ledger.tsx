@@ -14,7 +14,7 @@ export const STATUS: Record<LedgerStatus, string> = {
 
 const ORDER: LedgerStatus[] = ["missed", "off_track", "on_track", "delivered", "too_early", "not_measurable"];
 
-const METRIC: Record<string, string> = {
+export const METRIC: Record<string, string> = {
   revenue: "Revenue",
   revenue_growth: "Revenue growth",
   ebitda: "EBITDA",

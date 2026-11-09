@@ -6,7 +6,8 @@ import PeopleCard from "@/components/PeopleCard";
 import ResultsCard from "@/components/ResultsCard";
 import { fmtDay, fmtMultiple, fmtPct, fmtWhen } from "@/lib/format";
 import { ANOMALY, categoryLabel } from "@/lib/labels";
-import { getEvent } from "@/lib/queries";
+import { getEvent, getLedgerNow } from "@/lib/queries";
+import LedgerCheck from "@/components/LedgerCheck";
 import { sessionUser } from "@/lib/profile";
 import { clean } from "@/lib/text";
 
@@ -21,6 +22,8 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
   const { event: e, filings, hits } = data;
   const user = await sessionUser();
   const reaction = e.enrichment?.reaction;
+  const fresh = e.enrichment?.ledger?.measured ? e.enrichment.ledger : null;
+  const ledger = e.category === "results" ? (fresh ?? (await getLedgerNow(e.isin))) : null;
   return (
     <main className="page">
       <Masthead user={user} note={TIER[e.tier] ?? ""} />
@@ -39,6 +42,7 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
         {e.enrichment?.results_card && (
           <ResultsCard card={e.enrichment.results_card} filingUrl={filings[0]?.attachment_url} />
         )}
+        {ledger && e.symbol && <LedgerCheck check={ledger} symbol={e.symbol} fresh={fresh !== null} />}
         {e.enrichment?.people_card && <PeopleCard card={e.enrichment.people_card} />}
         {reaction && <ReactionLine r={reaction} />}
         <Why b={e.score_breakdown} category={e.category} stage={e.stage} />

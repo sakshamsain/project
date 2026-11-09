@@ -627,7 +627,7 @@ input[type="number"] {
 
 .tabs ul {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   max-width: var(--measure);
   height: var(--nav-h);
   margin: 0 auto;
@@ -1594,4 +1594,79 @@ input[type="number"] {
   display: inline-block;
   min-height: 1.5rem;
   padding: 0 0.15rem;
+}
+
+/* ---------- the bridge: results against the ledger ---------- */
+
+.ledger-check {
+  margin: 1.25rem 0 0.5rem;
+  padding: 0.9rem 0.95rem 0.6rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--stamp);
+  border-radius: var(--radius-panel);
+}
+
+.ledger-check .section-title {
+  font-size: 1.0625rem;
+  margin-bottom: 0.35rem;
+}
+
+.ledger-check .chip {
+  margin-left: 0.25rem;
+}
+
+.ledger-note {
+  display: block;
+  font-weight: 600;
+  margin: 0.15rem 0;
+}
+
+.ledger-line {
+  margin: 0.35rem 0 0;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.ledger-line a {
+  color: var(--stamp);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* ---------- inbox ---------- */
+
+.tabs a {
+  position: relative;
+}
+
+.badge {
+  position: absolute;
+  top: 0.35rem;
+  left: calc(50% + 0.35rem);
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--stamp);
+  color: var(--surface);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.1rem;
+  text-align: center;
+}
+
+.inbox-item.new .line-text > a {
+  font-weight: 600;
+}
+
+.inbox-item.new .line-text > a::before {
+  content: "";
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-right: 0.4rem;
+  border-radius: 50%;
+  background: var(--stamp);
+  vertical-align: 0.12em;
 }

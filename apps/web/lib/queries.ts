@@ -47,9 +47,60 @@ export type BriefRow = {
   last_filed_at: string | null;
   filing_count: number;
   score_breakdown: Breakdown | null;
-  enrichment: { reaction?: Reaction; results_card?: ResultsCardData; people_card?: PeopleCardData } | null;
+  enrichment: {
+    reaction?: Reaction;
+    results_card?: ResultsCardData;
+    people_card?: PeopleCardData;
+    ledger?: LedgerCheck;
+  } | null;
   attachment_url: string | null;
 };
+
+// The bridge: a results event's check against the company's Promise Ledger, made by
+// the worker when the results were read (or the ledger's latest statuses, for results
+// that arrived before the check existed).
+export type LedgerPromise = {
+  id: number;
+  metric: string;
+  metric_key: string | null;
+  period: string | null;
+  status: "delivered" | "missed" | "on_track" | "off_track";
+  note: string | null;
+  quote: string;
+  page: number | null;
+  document_id: number;
+  call_date: string;
+};
+
+export type LedgerCheck = {
+  counts: Record<string, number>;
+  measured: LedgerPromise[];
+  changes: { id: number; metric: string; period: string | null; was: string | null }[];
+  checked_at: string;
+};
+
+export async function getLedgerNow(isin: string): Promise<LedgerCheck | null> {
+  const rows = await query<LedgerPromise & { counts: Record<string, number>; checked_at: string }>(
+    `with c as (select jsonb_object_agg(status, n) as counts, max(checked_at)::text as checked_at
+                  from (select status, count(*)::int as n, max(checked_at) as checked_at
+                          from guidance where isin = $1 group by status) s)
+     select g.id::int as id, g.metric, g.metric_key, g.period_label as period, g.status,
+            g.actual_note as note,
+            g.quote, g.page, g.document_id::int as document_id, g.call_date::text as call_date,
+            c.counts, c.checked_at
+       from guidance g, c
+      where g.isin = $1 and g.status in ('delivered', 'missed', 'on_track', 'off_track')
+      order by g.call_date desc, g.id limit 6`,
+    [isin],
+  );
+  if (rows.length === 0) return null;
+  return {
+    counts: rows[0].counts,
+    checked_at: rows[0].checked_at,
+    changes: [],
+    measured: rows.map(({ counts: _c, checked_at: _t, ...p }) => p),
+  };
+}
 
 export async function getBrief(profileId: string, from: Date, to: Date): Promise<BriefRow[]> {
   return query<BriefRow>(

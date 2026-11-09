@@ -106,6 +106,15 @@ export function Story({ r }: { r: BriefRow }) {
       {r.enrichment?.results_card && (
         <ResultsCard card={r.enrichment.results_card} filingUrl={r.attachment_url} />
       )}
+      {r.enrichment?.ledger?.measured && r.symbol && (
+        <p className="ledger-line">
+          <Link href={`/event/${r.event_id}`}>Promise Ledger</Link>:{" "}
+          {(["delivered", "on_track", "off_track", "missed"] as const)
+            .filter((k) => r.enrichment?.ledger?.counts[k])
+            .map((k) => `${r.enrichment?.ledger?.counts[k]} ${k.replace("_", " ")}`)
+            .join(", ") || "nothing measurable yet"}
+        </p>
+      )}
       {r.enrichment?.people_card && <PeopleCard card={r.enrichment.people_card} compact />}
       {reaction && <ReactionLine r={reaction} />}
       <div className="story-foot">

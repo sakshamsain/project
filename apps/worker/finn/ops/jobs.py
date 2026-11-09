@@ -293,6 +293,18 @@ def run_results(
         with _step(url) as conn:
             store_card(conn, str(e["isin"]), int(e["id"]), card)
         statuses[card["status"]] = statuses.get(card["status"], 0) + 1
+        if card["status"] == "ok":
+            # The bridge: these results checked against the company's Promise Ledger.
+            from finn.pull.bridge import recheck_after_results
+
+            try:
+                summary = recheck_after_results(
+                    url, nse, str(e["isin"]), str(e["symbol"]), int(e["id"])
+                )
+            except Exception as exc:  # noqa: BLE001 - the card stands without it
+                summary = {"error": f"{type(exc).__name__}: {exc}"[:200]}
+            if summary is not None:
+                statuses["ledger_checked"] = statuses.get("ledger_checked", 0) + 1
     return {"tried": len(todo), "statuses": statuses}
 
 
@@ -391,6 +403,51 @@ def tracked_companies(url: str) -> list[dict[str, Any]]:
             "   select isin from holdings union"
             "   select isin from dossier_sections where section = 'ledger')",
         )
+
+
+def stale_dossiers(url: str, max_age_days: int = 30) -> list[dict[str, Any]]:
+    """Tracked companies whose dossier is missing, lacks the annual reports, is older than
+    `max_age_days`, or has a results filing, a call transcript or an annual report filed
+    since it was built. Everything else is served from what is stored."""
+    with _step(url) as conn:
+        return fetch_all(
+            conn,
+            "with t as ("
+            "  select distinct a.isin, a.value as symbol from company_aliases a"
+            "  where a.kind = 'nse_symbol' and a.valid_to is null and a.isin in ("
+            "    select isin from holdings union"
+            "    select isin from dossier_sections where section = 'ledger')),"
+            " b as (select isin, max(built_at) as built_at from dossier_sections"
+            "  where section = 'ledger' group by isin)"
+            " select t.isin, t.symbol, b.built_at::text as built_at from t left join b using (isin)"
+            " where b.built_at is null"
+            "  or b.built_at < now() - make_interval(days => %s)"
+            "  or not exists (select 1 from dossier_sections s"
+            "                 where s.isin = t.isin and s.section = 'annual_reports')"
+            "  or exists (select 1 from filings f where f.isin = t.isin"
+            "             and f.filed_at > b.built_at"
+            "             and (f.category in ('results', 'earnings_call')"
+            "                  or f.subject ilike '%%annual report%%'))"
+            " order by b.built_at nulls first, t.symbol",
+            [max_age_days],
+        )
+
+
+def run_refresh_dossiers(url: str, nse: Any, llm: Any, limit: int = 40) -> dict[str, Any]:
+    """Rebuild stale dossiers one after another. Model answers are cached by input, so a
+    rebuild costs calls only for documents filed since the last one."""
+    from finn.pull.dossier import build_dossier
+
+    out: dict[str, Any] = {}
+    for row in stale_dossiers(url)[:limit]:
+        symbol = str(row["symbol"])
+        try:
+            res = build_dossier(url, nse, llm, symbol)
+            annual = res.get("annual", {})
+            out[symbol] = {"counts": res.get("counts"), "annual_read": annual.get("read")}
+        except Exception as exc:  # noqa: BLE001 - one company must not stop the rest
+            out[symbol] = {"error": f"{type(exc).__name__}: {exc}"[:300]}
+    return out
 
 
 def run_price_history(url: str, nse: Nse, days: int = 370) -> dict[str, Any]:

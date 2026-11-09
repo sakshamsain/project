@@ -174,6 +174,23 @@ def dossier(symbol: str, transcripts: int = 4, annual: bool = True) -> dict[str,
     )
 
 
+@app.function(
+    image=image,
+    secrets=secrets,
+    schedule=modal.Cron("40 2 * * *", timezone=IST),
+    timeout=3 * 3600,
+    memory=REPORT_MEMORY_MB,
+    max_containers=1,
+)
+def dossiers_nightly(limit: int = 40) -> dict[str, Any]:
+    """02:40 IST: rebuild the portfolio and research dossiers that new filings made stale,
+    so a reader's first open is instant."""
+    from finn.ops.jobs import make_llm, run_refresh_dossiers
+
+    url = _setup()
+    return _log("dossiers_nightly", run_refresh_dossiers(url, _client(), make_llm(url), limit))
+
+
 @app.function(image=image, secrets=secrets, timeout=3600, memory=REPORT_MEMORY_MB)
 def research_job(job_id: int) -> dict[str, Any]:
     """Build the dossier a reader asked for."""

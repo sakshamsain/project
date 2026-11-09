@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const TABS = [
   {
@@ -15,6 +16,16 @@ const TABS = [
     href: "/pulse",
     label: "Pulse",
     icon: <path d="M3 13h4l2-6 4 11 2-5h6" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" strokeLinecap="round" />,
+  },
+  {
+    href: "/inbox",
+    label: "Inbox",
+    icon: (
+      <g fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" strokeLinecap="round">
+        <path d="M4 13l2.5-7h11L20 13v6H4z" />
+        <path d="M4 13h4.5l1 2h5l1-2H20" />
+      </g>
+    ),
   },
   {
     href: "/research",
@@ -39,8 +50,29 @@ const TABS = [
   },
 ];
 
+function useUnread(path: string): number {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    let stop = false;
+    const load = () =>
+      fetch("/api/inbox", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : { unread: 0 }))
+        .then((j: { unread: number }) => !stop && setN(j.unread))
+        .catch(() => undefined);
+    void load();
+    const cleared = () => setN(0);
+    window.addEventListener("finn:inbox-seen", cleared);
+    return () => {
+      stop = true;
+      window.removeEventListener("finn:inbox-seen", cleared);
+    };
+  }, [path]);
+  return path.startsWith("/inbox") ? 0 : n;
+}
+
 export default function Tabs() {
   const path = usePathname();
+  const unread = useUnread(path);
   const active = (href: string) =>
     href === "/" ? path === "/" || path.startsWith("/event") || path.startsWith("/company") : path.startsWith(href);
   return (
@@ -53,6 +85,11 @@ export default function Tabs() {
                 {t.icon}
               </svg>
               {t.label}
+              {t.href === "/inbox" && unread > 0 && (
+                <span className="badge" aria-label={`${unread} new`}>
+                  {unread > 9 ? "9+" : unread}
+                </span>
+              )}
             </Link>
           </li>
         ))}
