@@ -371,6 +371,7 @@ def build_annual(
                 "lines": len(ex.lines),
                 "dropped": ex.dropped,
                 "incomplete": ex.incomplete,
+                "added_by_code": ex.added,
                 "model": model,
             }
         )

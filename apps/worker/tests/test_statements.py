@@ -79,15 +79,30 @@ def test_a_figure_not_in_its_row_is_dropped() -> None:
     assert any(d.startswith("cfo:") for d in ex.dropped)
 
 
-def test_a_summed_line_left_out_withholds_the_sum() -> None:
+def test_a_summed_line_left_out_is_read_by_code() -> None:
     data = copy.deepcopy(recorded("statements"))
     data["lines"] = [ln for ln in data["lines"] if ln["key"] != "buyback"]
     ex = verify_lines(data, infy_pages())
-    assert ex.incomplete == {"current": ["buyback"]}
-    table = cash_table([("FY26", ex, 1)], {}, lender=False)
-    fy26 = table["years"][0]
-    assert fy26["buyback"] is None and fy26["payout"] is None
-    assert fy26["withheld"] == ["buyback"]
+    assert not ex.incomplete and len(ex.added) == 1 and ex.added[0].startswith("buyback:")
+    fy26 = cash_table([("FY26", ex, 1)], {}, lender=False)["years"][0]
+    assert fy26["buyback"] == 18058.0 and fy26["withheld"] == []
+
+
+def test_a_line_code_cannot_place_withholds_the_sum() -> None:
+    # A capex line printed without brackets is left to the model; missing, the sum goes.
+    pages = {
+        5: "Cash flow from investing activities\nPurchase of property, plant and equipment\n"
+        "1,234\n1,100\nProceeds from sale of investments\n50\n40\n(In ` crore)"
+    }
+    ex = verify_lines({"lines": []}, pages)
+    assert ex.added == [] and ex.incomplete == {"current": ["capex"], "prior": ["capex"]}
+
+
+def test_a_footnote_is_not_a_row() -> None:
+    from finn.pull.statements import add_code_rows
+
+    pages = {7: "Note: purchase of property, plant and equipment includes capital advances of 120"}
+    assert add_code_rows([], pages, 1.0) == []
 
 
 def test_buyback_escrow_rows_are_not_buyback_payments() -> None:

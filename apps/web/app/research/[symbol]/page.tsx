@@ -2,6 +2,7 @@ import Link from "next/link";
 import Masthead from "@/components/Masthead";
 import JobProgress from "@/components/JobProgress";
 import { ThreadCard, threads } from "@/components/Ledger";
+import ActiveTab from "@/components/dossier/ActiveTab";
 import Case from "@/components/dossier/Case";
 import Cash from "@/components/dossier/Cash";
 import Snapshot from "@/components/dossier/Snapshot";
@@ -139,6 +140,7 @@ export default async function DossierPage({
           ))}
         </ul>
       </nav>
+      <ActiveTab tab={current} />
 
       {current === "snapshot" && (
         <Snapshot

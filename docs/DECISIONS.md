@@ -134,7 +134,9 @@ PBT less tax is profit), and full-year revenue and profit are checked against th
 quarterly XBRL filings: on all five research companies FY26 matched exactly. Lines that
 are summed (capex, dividends, buybacks) need both sides to agree: code scans for them
 too, withholds a sum if the model missed a line, and drops a model line code does not
-recognise (TCS's advances for leased assets are not capex). A weak answer is asked once
+recognise (TCS's advances for leased assets are not capex). Where the model skips a
+summed line, code reads it itself if the row looks like a statement payment (both year
+columns, figures in brackets); otherwise the sum is withheld. A weak answer is asked once
 more of the stronger model, which must not be served the weaker model's cached answer.
 
 ## 023 · Bull vs bear only from checked facts

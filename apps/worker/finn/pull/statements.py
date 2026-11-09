@@ -108,6 +108,7 @@ class Extracted:
     # Lines code found on the pages that the model did not list, by column: a sum made
     # without them would be wrong, so it is not made.
     incomplete: dict[str, list[str]] = field(default_factory=dict)
+    added: list[str] = field(default_factory=list)  # summed lines code read itself
 
 
 def _shape(data: Any) -> None:
@@ -243,11 +244,13 @@ def verify_lines(data: Any, pages: Mapping[int, str]) -> Extracted:
                 None if pri is None else round(pri * scale, 4),
             )
         )
+    out.added = add_code_rows(out.lines, pages, scale)
     out.incomplete = missing_lines(out.lines, pages, scale)
     return out
 
 
-# Lines that are summed: code finds them itself and checks the model listed each one.
+# Lines that are summed: code finds them itself, checks the model listed each one, and
+# adds any the model left out.
 _SUMMED = {
     "capex": re.compile(
         r"(?:purchase|acquisition|payments?|expenditure|additions?|investment)s? "
@@ -271,23 +274,105 @@ def is_summed_label(key: str, label: str) -> bool:
     return bool(_SUMMED[key].search(text)) and not _NOT_SUMMED.search(text)
 
 
-def summed_rows(pages: Mapping[int, str], key: str) -> list[tuple[float | None, float | None]]:
-    """(current, prior) of every row on the pages whose label names a summed line."""
-    out: list[tuple[float | None, float | None]] = []
-    for text in pages.values():
+@dataclass(frozen=True, slots=True)
+class CodeRow:
+    """A summed line code found on its own: the label up to its figures, and the first
+    two figures of the row after any note numbers."""
+
+    page: int
+    label: str
+    current: float | None
+    prior: float | None
+    at: int  # where the row's figures start in the page's normalised text
+
+
+def row_figures(toks: Sequence[float | None]) -> list[float | None]:
+    """The row's two figures after any note numbers, as `matched_row` reads them."""
+    k = 0
+    while k < MAX_NOTE_TOKENS and len(toks) - k > 2 and _note_like(toks[k]):
+        k += 1
+    return list(toks[k : k + 2])
+
+
+def code_rows(pages: Mapping[int, str], key: str) -> list[CodeRow]:
+    """Every row on the pages whose label names a summed line, one per row."""
+    out: list[CodeRow] = []
+    seen: set[tuple[int, int]] = set()
+    for page, text in sorted(pages.items()):
         hay = normalize(text)
         for m in _SUMMED[key].finditer(hay):
             post = hay[m.end() : m.end() + WINDOW]
             first = _ROW_TOKEN.search(post)
-            label = _LABEL_START.split(hay[max(0, m.start() - 80) : m.start()])[-1]
-            label += post[: first.start() if first else 0]
-            if _NOT_SUMMED.search(label):
+            if first is None:
                 continue
-            toks = row_tokens(row_after(post))
-            figs = [t for t in toks if not _note_like(t)] if len(toks) > 2 else toks
-            if figs:
-                out.append((figs[0], figs[1] if len(figs) > 1 else None))
+            label = _LABEL_START.split(hay[max(0, m.start() - 80) : m.start()])[-1]
+            label = re.sub(r"\s+", " ", label + hay[m.start() : m.end()] + post[: first.start()])
+            if _NOT_SUMMED.search(label) or (page, m.end() + first.start()) in seen:
+                continue
+            figs = row_figures(row_tokens(row_after(post)))
+            if not figs:
+                continue
+            seen.add((page, m.end() + first.start()))
+            label = label.strip(" -:;,")
+            out.append(
+                CodeRow(
+                    page,
+                    label[:1].upper() + label[1:160],
+                    figs[0],
+                    figs[1] if len(figs) > 1 else None,
+                    m.end() + first.start(),
+                )
+            )
     return out
+
+
+def summed_rows(pages: Mapping[int, str], key: str) -> list[tuple[float | None, float | None]]:
+    """(current, prior) of every row on the pages whose label names a summed line."""
+    return [(r.current, r.prior) for r in code_rows(pages, key)]
+
+
+def _covered(lines: Sequence[Line], key: str, row: CodeRow, scale: float) -> bool:
+    for ln in lines:
+        if ln.key != key:
+            continue
+        for mine, theirs in ((ln.current, row.current), (ln.prior, row.prior)):
+            if theirs is None or theirs == 0.0 or mine is None:
+                continue
+            if abs(abs(mine) - abs(theirs) * scale) < 1e-6:
+                return True
+    return False
+
+
+def _statement_outflow(row: CodeRow) -> bool:
+    """A row code may add on its own: both year columns printed (a dash counts) and
+    every figure an outflow in brackets, as cash-flow statements print payments. A
+    footnote's "includes capital advances of 120" fails and stays the model's to read."""
+    figs = [row.current, row.prior]
+    if row.prior is None and row.current is None:
+        return False
+    values = [f for f in figs if f is not None and f != 0.0]
+    return bool(values) and all(v < 0 for v in values) and row.at >= 0 and len(figs) == 2
+
+
+def add_code_rows(lines: list[Line], pages: Mapping[int, str], scale: float) -> list[str]:
+    """Summed lines code found that the model left out, added to `lines` (rules before
+    models: the same row rules that check the model's lines read them)."""
+    added: list[str] = []
+    for key in MULTI:
+        for row in code_rows(pages, key):
+            if not _statement_outflow(row) or _covered(lines, key, row, scale):
+                continue
+            lines.append(
+                Line(
+                    key,
+                    row.label,
+                    row.page,
+                    None if row.current is None else round(row.current * scale, 4),
+                    None if row.prior is None else round(row.prior * scale, 4),
+                )
+            )
+            added.append(f"{key}: {row.label[:60]} (p. {row.page})")
+    return added
 
 
 def missing_lines(

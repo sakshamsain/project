@@ -160,14 +160,31 @@ _MDNA = re.compile(
 _RISK_WORDS = re.compile(r"\brisks?\b|\bthreats?\b|\bconcerns?\b|headwinds?|uncertaint")
 
 
+# A title set as a heading, wherever the PDF puts it (mid-page on a two-page spread): next
+# to its period or its unit, unlike a mention in running text ("...the Consolidated
+# Statement of Profit and Loss (including other comprehensive income)...").
+_HEADING_BEFORE = re.compile(r"for the (?:year|period) ended [^.;]{0,30}$")
+_HEADING_AFTER = re.compile(
+    r"^\W{0,3}(?:\(contd\.?\)\s*)?(?:for the (?:year|period) ended|[^.;]{0,60}?\(\s*\S{0,3}\s*in\s+"
+    r"(?:\S{1,3}\s+)?(?:crores?|lakhs?|millions?)\s*\))"
+)
+
+
 def _titled(page: str, kind: str, consolidated: bool) -> bool:
-    """The statement's title at the top of the page, or at the bottom, where some PDFs
-    put the text of a page's heading."""
+    """The statement's title at the top of the page, at the bottom (where some PDFs put
+    the text of a page's heading), or anywhere it is set as a heading."""
     for part in (page[:HEAD], page[-TAIL:]):
         for m in _TITLES[kind].finditer(part):
             named = "consolidated" in part[max(0, m.start() - 30) : m.start()]
             if named == consolidated and (consolidated or "consolidated" not in part):
                 return True
+    for m in _TITLES[kind].finditer(page):
+        named = "consolidated" in page[max(0, m.start() - 30) : m.start()]
+        if named != consolidated or (not consolidated and "consolidated" in page[:HEAD]):
+            continue
+        before = page[max(0, m.start() - 70) : m.start()].replace("consolidated", "").rstrip()
+        if _HEADING_BEFORE.search(before) or _HEADING_AFTER.search(page[m.end() : m.end() + 100]):
+            return True
     return False
 
 

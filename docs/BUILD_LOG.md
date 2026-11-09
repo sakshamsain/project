@@ -129,7 +129,7 @@ Three lines a day: what was asked, what went wrong, what changed.
   names; and a bull and bear case written only from checked facts. Research pages became
   six tabs, and every citation opens the stored page with the quote marked. Built for
   INFY, TCS, HCLTECH, DIXON and BAJFINANCE; FY26 revenue and profit from each report
-  matched the sum of its four quarterly XBRL filings. 235 worker tests, 2 web tests.
+  matched the sum of its four quarterly XBRL filings. 237 worker tests, 2 web tests.
 - **Went wrong:** HCLTech's statement titles come out of the PDF at the bottom of the
   page; Dixon reports in lakh as "` / Lakhs"; Bajaj Finance's auditor heading is an
   image; one PDF drops the "t" of "report". Dixon's cash-flow range ran onto the
@@ -141,6 +141,15 @@ Three lines a day: what was asked, what went wrong, what changed.
   summed line. The model client's cache handed an escalated retry the weaker model's
   answer; escalation now skips other models' cache. The first bull and bear points all
   failed the figure check because the model wrote "(F1)" into its sentences.
+- **Generalisation check:** asked the live app for a company it had never seen
+  (ASIANPAINT). The dossier built in 102 seconds, but two gaps showed: on its two-page
+  spreads the profit and loss title sits mid-page, so the FY25 statement was missed
+  (titles set as headings, next to their period or unit, now count anywhere on the
+  page), and the model skipped the FY26 dividend row, so the sum was withheld. Code now
+  reads a summed line itself when the row looks like a statement payment (both year
+  columns, figures in brackets); a footnote amount does not qualify. After the fix all
+  three years are complete and FY26 matches the quarterly filings; the five earlier
+  companies' figures did not change.
 - **Next:** evals for the annual-report extraction (line recall against hand-checked
   statements, case faithfulness); segment revenue from the segment note; delivery
   statements for promises the filings cannot measure; the covering note.
