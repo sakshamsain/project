@@ -15,8 +15,10 @@ add or remove one and your device gets its own copy, or create an account to kee
 every device).
 
 What is in the app: the Brief (Today), Pulse (end-of-day moves), company pages with
-interactive price and quarterly results charts, the Promise Ledger for any NSE company
-(Research), results and people cards, notifications, accounts, and search.
+interactive price and quarterly results charts, a Dossier for any NSE company (Research:
+Snapshot, Trajectory, Promises, Cash, Bull vs bear, Sources), results and people cards,
+notifications, accounts, and search. Every quote and figure in a Dossier links to the
+page of the filing it came from, with the words marked.
 
 > Status: build week, 8–15 Nov 2026. This README grows with the build; see
 > `docs/BUILD_LOG.md` for progress.
@@ -81,3 +83,29 @@ in primary filings with page citations; holdings never enter a prompt. See
    filings and marks it delivered, missed, on track, off track, too early, or not in the
    filings, with the comparison written out.
 5. Type a symbol on the Research tab and a ledger is built in about a minute.
+
+## How the annual-report half of the Dossier is made
+
+1. The worker takes the last two annual reports from NSE's annual-report feed (a revision
+   replaces the original) and reads every page of each, 300 to 600 of them.
+2. It finds the parts it needs by what is on the page, not by page number: the
+   consolidated statement of profit and loss and statement of cash flows (title near the
+   top or bottom of the page, dozens of figures), the independent auditor's report (its
+   heading, or its opening paragraph when the heading is an image), BRSR Section A
+   (SEBI's fixed format for what a company does) and the MD&A (bookmarks or running
+   headers). Only those pages are stored, under their page numbers in the PDF.
+3. Statements: a model copies the lines asked for, figures exactly as printed. Code keeps
+   a line only if its label is on the page and its two figures are the first two in that
+   row (current year first); it reads the unit from the page, converts to ₹ crore, and
+   does every sum. Operating, investing and financing flows must add up to the change in
+   cash, profit before tax less tax must equal profit, and full-year revenue and profit
+   are compared with the four quarterly XBRL filings. A year that fails shows "numbers
+   need a look" instead of figures. For capex, dividends and buybacks, code finds the
+   lines itself too: a sum is withheld if the model missed one, and a line is dropped if
+   code does not recognise it as part of the sum.
+4. Business, auditor and risks: quotes the model copied, kept only if they are on the
+   page; the auditor's opinion is read from the report's headings; an emphasis-of-matter
+   paragraph is cut from the text by code.
+5. Bull vs bear: a stronger model writes up to three points each way from a numbered
+   list of facts code has already checked or computed; a point is dropped if it cites no
+   fact or states a figure its facts do not contain. Both sides are always shown.

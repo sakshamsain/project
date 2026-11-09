@@ -1,4 +1,5 @@
 import RangeCheck from "@/components/charts/RangeCheck";
+import Cite from "@/components/dossier/Cite";
 import { fmtDay } from "@/lib/format";
 import type { LedgerStatus, Promise_ } from "@/lib/research";
 
@@ -150,11 +151,7 @@ export function ThreadCard({ t }: { t: Thread }) {
               {rev ? <span className={`rev ${rev}`}> {rev}</span> : null}
             </span>
             <q>{p.quote}</q>{" "}
-            {p.source_url && p.page ? (
-              <a className="cite" href={`${p.source_url}#page=${p.page}`} target="_blank" rel="noopener noreferrer">
-                p.&nbsp;{p.page}
-              </a>
-            ) : null}
+            <Cite doc={p.document_id} page={p.page} quote={p.quote} url={p.source_url} />
           </li>
           );
         })}

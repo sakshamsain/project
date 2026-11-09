@@ -82,3 +82,16 @@ export function parseWindow(w: string | undefined, now: Date = new Date()) {
   const win = WINDOWS.find((x) => x.key === w) ?? WINDOWS[0];
   return { ...win, from: new Date(now.getTime() - win.hours * 3_600_000), to: now };
 }
+
+/** An amount in ₹ crore as filings print it: "1,78,650"; small amounts keep a decimal. */
+export function fmtCrore(x: number): string {
+  const s = Math.abs(x).toLocaleString("en-IN", { maximumFractionDigits: Math.abs(x) >= 100 ? 0 : 1 });
+  return x < 0 ? `${MINUS}${s}` : s;
+}
+
+/** A plain percentage: "115.3%", "0.12%". */
+export function fmtShare(x: number): string {
+  const stated = Math.round(x * 100) % 10 !== 0; // keep a second decimal the filing gave
+  const digits = Math.abs(x) < 1 || stated ? 2 : 1;
+  return `${x.toLocaleString("en-IN", { minimumFractionDigits: digits, maximumFractionDigits: digits })}%`;
+}

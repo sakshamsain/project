@@ -116,3 +116,38 @@ profit as two charts, never a second axis. Every chart has a crosshair or per-ma
 tooltip, keyboard reading and a table view; filings sit on the price line and open on
 tap. The chart colour was run through the dataviz palette checks for both surfaces;
 dark mode uses its own darker violet step because the lighter one failed the band.
+
+## 021 · Annual reports are read by what is on the page
+Layouts differ by company (HCLTech's PDF puts statement titles at the bottom of the
+page, Dixon prints in lakh with the rupee sign as a stray glyph, Bajaj Finance's auditor
+heading is an image), so parts are found by content: a statement is a page with its title
+near the top or bottom, dozens of figures and the lines every such statement has; it ends
+at its closing line or where another statement starts. Consolidated statements are used
+when filed. The unit is read from the words on the page, never assumed. Ten reports from
+five companies were located correctly before any code shipped, and are kept as fixtures.
+
+## 022 · Statement figures: the model copies, code places and adds
+A figure counts only when it is one of the first two figures in its label's row, current
+year first, so a figure from the next row, a swapped column or a wide equity table is
+refused. Accounting identities gate each year (cash flows add up to the change in cash;
+PBT less tax is profit), and full-year revenue and profit are checked against the four
+quarterly XBRL filings: on all five research companies FY26 matched exactly. Lines that
+are summed (capex, dividends, buybacks) need both sides to agree: code scans for them
+too, withholds a sum if the model missed a line, and drops a model line code does not
+recognise (TCS's advances for leased assets are not capex). A weak answer is asked once
+more of the stronger model, which must not be served the weaker model's cached answer.
+
+## 023 · Bull vs bear only from checked facts
+The case is written from a numbered list of facts code already checked or computed:
+figures from the Cash table, promises with their ledger status, quotes verified in the
+annual report. Each point cites its facts; a number in a point must appear in a cited
+fact, and advice words fail the house style. Key audit matters are labelled as where the
+auditor looked hardest, not findings, and a lender's operating cash flow is left out
+because it tracks lending rather than health. Both sides are always shown together.
+
+## 024 · Keep only the pages read, and show them
+An annual report is 300-600 pages; FINN stores the 15-25 it reads, which keeps the
+database small enough for on-demand research on any ticker. Every citation opens FINN's
+copy of the page with the quote marked, and links the PDF at that page; transcript
+quotes in the ledger use the same view.
+

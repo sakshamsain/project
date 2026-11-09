@@ -18,6 +18,9 @@ SCANNED_CHARS_PER_PAGE = 200
 class PdfText:
     pages: list[str]
     scanned: bool
+    # The file's bookmarks as (level, title, page), when it has any. Annual reports
+    # often name their sections here; some only carry the names of merged files.
+    outline: tuple[tuple[int, str, int], ...] = ()
 
     def numbered(self, limit_chars: int = 400_000) -> str:
         """Pages joined with markers a model can cite: [[page 3]]."""
@@ -67,6 +70,10 @@ def pdf_text(data: bytes, max_pages: int = 600) -> PdfText:
 
     with pymupdf.open(stream=data, filetype="pdf") as doc:  # type: ignore[no-untyped-call]
         pages = [clean_page(doc[i].get_text("text")) for i in range(min(len(doc), max_pages))]
+        outline = tuple(
+            (int(level), str(title).strip(), int(page))
+            for level, title, page, *_ in doc.get_toc(simple=True)
+        )
     chars = sum(len(p) for p in pages)
     scanned = not pages or chars / len(pages) < SCANNED_CHARS_PER_PAGE
-    return PdfText(pages, scanned)
+    return PdfText(pages, scanned, outline)

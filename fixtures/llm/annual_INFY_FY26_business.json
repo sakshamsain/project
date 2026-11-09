@@ -1,0 +1,34 @@
+{
+ "description": {
+  "quote": "Infosys Limited provides AI-first business consulting and technology services, to enable organizations to unlock AI value at scale.",
+  "page": 143
+ },
+ "activities": [
+  {
+   "name": "Software and IT consulting (GICS classification – Information Technology – Software and Services)",
+   "nic": "",
+   "share": "95.23",
+   "page": 143
+  }
+ ],
+ "products": [
+  {
+   "name": "Software application development and maintenance, IT consulting, technology and next-generation digital services",
+   "nic": "620 and 631",
+   "share": "95.23",
+   "page": 143
+  }
+ ],
+ "states": {
+  "figure": "15",
+  "page": 143
+ },
+ "countries": {
+  "figure": "84",
+  "page": 143
+ },
+ "exports": {
+  "figure": "97.40%",
+  "page": 143
+ }
+}

@@ -52,6 +52,7 @@ export type Promise_ = {
   page: number | null;
   call_date: string;
   source_url: string | null;
+  document_id: string;
 };
 
 export async function listLedgers() {
@@ -83,7 +84,7 @@ export async function getLedger(symbol: string) {
             g.value_low::float8 as value_low, g.value_high::float8 as value_high, g.unit,
             g.period_label, g.status, g.actual_value::float8 as actual_value, g.actual_note,
             g.quote, g.speaker, g.page,
-            g.call_date::text as call_date, d.source_url
+            g.call_date::text as call_date, d.source_url, g.document_id::text as document_id
        from guidance g join documents d on d.id = g.document_id
       where g.isin = $1
       order by g.call_date desc, g.id`,

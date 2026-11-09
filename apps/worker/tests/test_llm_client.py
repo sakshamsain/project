@@ -68,3 +68,14 @@ def test_every_model_failing_raises() -> None:
     llm = Llm("g", None, store=MemoryStore(), transport=fake, retries=0)
     with pytest.raises(LlmError):
         llm.json("t", "t2_reader", "v1", "s", "u", {"type": "object"})
+
+
+def test_escalating_skips_the_weaker_models_cached_answer() -> None:
+    fake = Fake([_gemini_ok('{"n": 1}'), _gemini_ok('{"n": 2}')])
+    llm = Llm("g", "q", store=MemoryStore(), transport=fake, retries=0)
+    first = llm.json("t", "t2_reader", "v1", "s", "u", {"type": "object"})
+    again = llm.json("t", "t2_reader", "v1", "s", "u", {"type": "object"}, escalate=True)
+    assert first.data == {"n": 1} and again.data == {"n": 2}
+    assert again.model == "gemini-3.6-flash"
+    cached = llm.json("t", "t2_reader", "v1", "s", "u", {"type": "object"}, escalate=True)
+    assert cached.cache_hit and cached.data == {"n": 2}

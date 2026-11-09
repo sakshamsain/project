@@ -37,6 +37,7 @@ image = (
 )
 secrets = [modal.Secret.from_name("finn-env")]
 IST = "Asia/Kolkata"
+REPORT_MEMORY_MB = 2048  # parsing a 500-page annual report
 
 
 def _setup() -> str:
@@ -65,6 +66,7 @@ def _log(name: str, out: dict[str, Any]) -> dict[str, Any]:
     schedule=modal.Cron("*/5 8-22 * * *", timezone=IST),
     timeout=600,
     max_containers=1,
+    memory=REPORT_MEMORY_MB,  # a queued research job may run here, annual reports and all
 )
 def poll() -> dict[str, Any]:
     """Filings every five minutes from 08:00 to 22:55 IST."""
@@ -158,19 +160,23 @@ def people(days: int = 30, limit: int = 30) -> dict[str, Any]:
     return _log("people", run_people(url, _client(), make_llm(url), days=days, limit=limit))
 
 
-@app.function(image=image, secrets=secrets, timeout=3600)
-def dossier(symbol: str, transcripts: int = 4) -> dict[str, Any]:
-    """The Promise Ledger for one company, from its last four call transcripts."""
+@app.function(image=image, secrets=secrets, timeout=3600, memory=REPORT_MEMORY_MB)
+def dossier(symbol: str, transcripts: int = 4, annual: bool = True) -> dict[str, Any]:
+    """The Dossier for one company: the Promise Ledger from its last four call
+    transcripts, then its last two annual reports."""
     from finn.ops.jobs import make_llm
     from finn.pull.dossier import build_dossier
 
     url = _setup()
-    return _log("dossier", build_dossier(url, _client(), make_llm(url), symbol, transcripts))
+    return _log(
+        "dossier",
+        build_dossier(url, _client(), make_llm(url), symbol, transcripts, annual=annual),
+    )
 
 
-@app.function(image=image, secrets=secrets, timeout=3600)
+@app.function(image=image, secrets=secrets, timeout=3600, memory=REPORT_MEMORY_MB)
 def research_job(job_id: int) -> dict[str, Any]:
-    """Build the ledger a reader asked for."""
+    """Build the dossier a reader asked for."""
     from finn.ops.jobs import make_llm
     from finn.ops.research_jobs import claim, run_job
 

@@ -1,6 +1,8 @@
-"""Build the Promise Ledger for one company.
+"""Build the Dossier for one company: the Promise Ledger, then the annual reports.
 
     transcripts (NSE) -> pages -> guidance (model, then verified) -> checks (code) -> ledger
+    annual reports (NSE) -> statements, business, auditor, risks -> bull and bear
+    (finn.pull.annual)
 
 Re-running is safe: documents are keyed by URL, a transcript's guidance is replaced as a
 whole, and every check is recomputed from the quarters on file.
@@ -14,6 +16,7 @@ from typing import Any, Protocol
 
 from finn.core.db import Conn, Jsonb, fetch_all
 from finn.llm.client import Llm
+from finn.pull.annual import build_annual
 from finn.pull.financials import lines_by_label, quarterly_results, store_quarters
 from finn.pull.fiscal import parse_period
 from finn.pull.guidance import PROMPT_VERSION, GuidanceItem, extract_guidance
@@ -28,6 +31,7 @@ class DossierSource(Protocol):
         self, day_from: date, day_to: date, symbol: str | None = None
     ) -> list[Any]: ...
     def integrated_filings(self, symbol: str) -> Any: ...
+    def annual_reports(self, symbol: str) -> Any: ...
     def fetch_text(self, url: str) -> str | None: ...
     def fetch_bytes(self, url: str, max_bytes: int = ...) -> bytes | None: ...
 
@@ -137,6 +141,7 @@ def build_dossier(
     transcripts: int = 4,
     today: date | None = None,
     progress: Callable[[str], None] | None = None,
+    annual: bool = True,
 ) -> dict[str, Any]:
     from finn.core.db import connect
 
@@ -238,4 +243,14 @@ def build_dossier(
             " do update set body = excluded.body, built_at = now()",
             [isin, PROMPT_VERSION, Jsonb(body)],
         )
-    return {"symbol": symbol.upper(), "transcripts": len(docs), "counts": counts}
+    result: dict[str, Any] = {"symbol": symbol.upper(), "transcripts": len(docs), "counts": counts}
+    if annual:
+        # The annual-report half; the ledger above is already stored whatever happens here.
+        lender = any(q.lender for q in quarters.values())
+        try:
+            result["annual"] = build_annual(
+                url, src, llm, isin, name, symbol.upper(), series, lender, say, today
+            )
+        except Exception as exc:  # noqa: BLE001 - reported in the result, ledger kept
+            result["annual"] = {"error": f"{type(exc).__name__}: {exc}"[:400]}
+    return result

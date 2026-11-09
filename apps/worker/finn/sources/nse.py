@@ -11,6 +11,7 @@ Feeds:
     EQUITY_L.csv                   every listed equity with its ISIN
     sec_bhavdata_full_DDMMYYYY.csv daily bars with delivery quantity
     ind_close_all_DDMMYYYY.csv     index closes
+    /api/annual-reports            annual reports, one row per filing (revisions included)
 """
 
 from __future__ import annotations
@@ -420,6 +421,53 @@ def pick_filing(
     return None
 
 
+@dataclass(frozen=True, slots=True)
+class AnnualReport:
+    """One annual report filed with NSE: a PDF, or for older years a zip holding one."""
+
+    fiscal_year: str  # FY26 for April 2025 to March 2026
+    url: str
+    filed_at: datetime | None
+    revised: bool
+    position: int  # in NSE's listing, 0 = first (newest)
+
+
+def parse_annual_reports(payload: Any) -> list[AnnualReport]:
+    """Rows of /api/annual-reports with a file in NSE's archives, in listing order."""
+    rows = payload.get("data", []) if isinstance(payload, Mapping) else payload
+    out: list[AnnualReport] = []
+    for i, r in enumerate(rows or []):
+        url = _text(r.get("fileName"))
+        to_year = _text(r.get("toYr"))
+        if not (url.startswith(ARCHIVES + "/") and url.lower().endswith((".pdf", ".zip"))):
+            continue
+        if not re.fullmatch(r"(?:19|20)\d\d", to_year):
+            continue
+        out.append(
+            AnnualReport(
+                fiscal_year=f"FY{to_year[2:]}",
+                url=url,
+                filed_at=parse_datetime(_text(r.get("disseminationDateTime")))
+                or parse_datetime(_text(r.get("broadcast_dttm"))),
+                revised=_text(r.get("submission_type")).lower() == "revised",
+                position=i,
+            )
+        )
+    return out
+
+
+def latest_annual_reports(reports: Sequence[AnnualReport], years: int = 2) -> list[AnnualReport]:
+    """The last filing for each of the latest `years` fiscal years, newest year first.
+    A revision filed after the original replaces it; undated rows rank by listing order."""
+    oldest = datetime.min.replace(tzinfo=IST)
+    best: dict[str, AnnualReport] = {}
+    for r in reports:
+        b = best.get(r.fiscal_year)
+        if b is None or (r.filed_at or oldest, -r.position) > (b.filed_at or oldest, -b.position):
+            best[r.fiscal_year] = r
+    return [best[fy] for fy in sorted(best, key=lambda fy: int(fy[2:]), reverse=True)[:years]]
+
+
 # --- client ----------------------------------------------------------------------------
 
 
@@ -533,6 +581,9 @@ class NseClient:
 
     def integrated_filings(self, symbol: str) -> Any:
         return self._json("integrated-filing-results", index="equities", symbol=symbol)
+
+    def annual_reports(self, symbol: str) -> Any:
+        return self._json("annual-reports", index="equities", symbol=symbol)
 
     def fetch_text(self, url: str) -> str | None:
         """A file from NSE's archives (XBRL, CSV); None when it is not there."""

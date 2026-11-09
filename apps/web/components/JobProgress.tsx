@@ -39,16 +39,16 @@ export default function JobProgress({ id }: { id: string }) {
   if (job?.status === "failed") {
     return (
       <p className="notice" role="status">
-        The ledger could not be built: {job.error ?? "unknown error"}. Try again later.
+        The dossier could not be built: {job.error ?? "unknown error"}. Try again later.
       </p>
     );
   }
   return (
     <div className="panel building" role="status" aria-live="polite">
-      <p className="building-title">Building the ledger</p>
+      <p className="building-title">Building the dossier</p>
       <p className="section-note" style={{ margin: 0 }}>
         {job?.status === "queued" || !job
-          ? "Waiting for a worker; this takes about a minute."
+          ? "Waiting for a worker; this takes two to three minutes."
           : (job.message ?? "Working")}
       </p>
     </div>

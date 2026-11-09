@@ -3,7 +3,8 @@ import Masthead from "@/components/Masthead";
 import { notFound } from "next/navigation";
 import { fmtDay, fmtPct, fmtPrice, fmtWhen } from "@/lib/format";
 import PriceChart from "@/components/charts/PriceChart";
-import QuarterChart, { type QuarterPoint } from "@/components/charts/QuarterChart";
+import QuarterChart from "@/components/charts/QuarterChart";
+import { series } from "@/lib/quarters";
 import { categoryLabel } from "@/lib/labels";
 import { currentProfile } from "@/lib/profile";
 import { getCompany } from "@/lib/queries";
@@ -11,18 +12,6 @@ import { hasLedger } from "@/lib/research";
 import { addHolding, removeHolding } from "../../settings/actions";
 
 export const dynamic = "force-dynamic";
-
-function series(rows: { period: string; metric: string; value: number }[], metric: string): QuarterPoint[] {
-  return rows
-    .filter((r) => r.metric === metric)
-    .map((r) => {
-      const m = /^Q([1-4])FY(\d{2})$/.exec(r.period);
-      return m ? { label: `Q${m[1]} FY${m[2]}`, q: Number(m[1]), fy: Number(m[2]), value: r.value } : null;
-    })
-    .filter((p): p is QuarterPoint => p !== null)
-    .sort((a, b) => a.fy - b.fy || a.q - b.q)
-    .slice(-8);
-}
 
 const TIER: Record<string, string> = { front: "Read first", oneliner: "In brief", folded: "Routine" };
 
@@ -79,7 +68,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ symbol
           </button>
           {ledger && (
             <Link className="button ghost small" href={`/research/${c.symbol}`} style={{ marginLeft: "0.5rem", textDecoration: "none" }}>
-              Promise ledger
+              Dossier
             </Link>
           )}
         </form>

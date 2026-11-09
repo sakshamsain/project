@@ -1307,3 +1307,291 @@ input[type="number"] {
     }
   }
 }
+
+/* ---------- dossier ---------- */
+
+.dossier-name {
+  font-size: clamp(1.8rem, 7vw, 2.5rem);
+  margin-top: 0.5rem;
+}
+
+/* Section tabs: a strip that scrolls sideways on a phone and sticks under the masthead. */
+.dtabs {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: 0 -1rem 1.5rem;
+  padding: 0 1rem;
+  background: color-mix(in srgb, var(--paper) 94%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--rule);
+}
+
+.dtabs ul {
+  display: flex;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* a fade at the edge says the strip scrolls */
+  -webkit-mask-image: linear-gradient(to right, #000 85%, transparent);
+  mask-image: linear-gradient(to right, #000 85%, transparent);
+}
+
+@media (min-width: 40rem) {
+  .dtabs ul {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+}
+
+.dtabs ul::-webkit-scrollbar {
+  display: none;
+}
+
+.dtabs a {
+  display: block;
+  padding: 0.7rem 0.6rem 0.6rem;
+  min-height: 2.75rem;
+  white-space: nowrap;
+  text-decoration: none;
+  color: var(--muted);
+  font-size: 0.9375rem;
+  border-bottom: 2px solid transparent;
+}
+
+.dtabs a[aria-current="page"] {
+  color: var(--ink);
+  font-weight: 600;
+  border-bottom-color: var(--stamp);
+}
+
+.lede {
+  font-size: 1.0625rem;
+  margin: 0 0 0.9rem;
+  max-width: 36rem;
+}
+
+.lede q,
+.notice q {
+  quotes: "\201C" "\201D";
+}
+
+.lede-small {
+  font-size: 0.9875rem;
+  margin: 0 0 0.75rem;
+  max-width: 36rem;
+}
+
+.kv-sub,
+.cell-sub {
+  color: var(--faint);
+  font-size: 0.8125rem;
+}
+
+.cell-sub {
+  display: block;
+}
+
+.cite-note {
+  font-size: 0.75rem;
+  color: var(--faint);
+}
+
+.shares {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.shares li {
+  position: relative;
+  padding-top: 0.45rem;
+}
+
+.share-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 0.25rem;
+  border-radius: 2px;
+  background: var(--chart);
+}
+
+.share-bar::after {
+  content: "";
+}
+
+.share-text {
+  font-size: 0.9375rem;
+}
+
+/* Year-by-year tables: years as columns, the label column takes what is left. */
+.ctable-wrap {
+  overflow-x: auto;
+}
+
+.ctable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ctable th,
+.ctable td {
+  padding: 0.5rem 0.35rem;
+  border-top: 1px solid var(--rule);
+  vertical-align: top;
+}
+
+.ctable thead th {
+  border-top: 0;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.8125rem;
+  text-align: right;
+}
+
+.ctable tbody th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--ink);
+  padding-left: 0;
+}
+
+.ctable td {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.ctable tr.computed th,
+.ctable tr.computed td {
+  background: var(--stamp-soft);
+}
+
+.ctable tr.computed th {
+  padding-left: 0.35rem;
+}
+
+.ctable td.na {
+  color: var(--faint);
+}
+
+/* Bull and bear side by side on wide screens, one after the other on a phone. */
+.case {
+  display: grid;
+  gap: 0.5rem 1.5rem;
+}
+
+@media (min-width: 40rem) {
+  .case {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.side {
+  margin: 0 0 1.5rem;
+}
+
+.side.bull .section-title::before,
+.side.bear .section-title::before {
+  font-size: 0.875rem;
+}
+
+.side.bull .section-title::before {
+  content: "▲";
+  color: var(--up);
+}
+
+.side.bear .section-title::before {
+  content: "▼";
+  color: var(--down);
+}
+
+.points {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.points > li {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-panel);
+  padding: 0.7rem 0.85rem 0.55rem;
+}
+
+.point {
+  margin: 0 0 0.35rem;
+  font-size: 0.9875rem;
+}
+
+.basis summary {
+  cursor: pointer;
+  color: var(--stamp);
+  font-size: 0.8125rem;
+  min-height: 1.75rem;
+  display: flex;
+  align-items: center;
+}
+
+.basis ul {
+  margin: 0.25rem 0 0.2rem;
+  padding-left: 1rem;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.basis li {
+  margin: 0.3rem 0;
+}
+
+.part {
+  display: inline-block;
+  margin: 0.2rem 0.6rem 0 0;
+  color: var(--stamp);
+  font-size: 0.8125rem;
+}
+
+/* Source pages: the PDF's text with the quote marked. */
+.back {
+  margin: 0 0 0.75rem;
+  font-size: 0.9375rem;
+}
+
+.source-title {
+  font-family: var(--font-display), sans-serif;
+  font-variation-settings: "wdth" 85;
+  font-size: 1.5rem;
+  margin: 0 0 0.25rem;
+}
+
+.source-page {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  max-height: none;
+}
+
+.source-page mark {
+  background: var(--stamp-soft);
+  color: var(--ink);
+  box-shadow: 0 0 0 2px var(--stamp-soft);
+  border-radius: 2px;
+  scroll-margin: 6rem;
+}
+
+.cite {
+  display: inline-block;
+  min-height: 1.5rem;
+  padding: 0 0.15rem;
+}

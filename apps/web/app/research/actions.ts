@@ -32,9 +32,12 @@ export async function requestLedger(form: FormData) {
   );
   if (!company) redirect(`/research?error=unknown&q=${encodeURIComponent(raw)}`);
 
+  // A dossier built in the last three days is shown as it is, if it has both halves.
   const fresh = await query(
-    `select 1 from dossier_sections where isin = $1 and section = 'ledger'
-       and built_at > now() - interval '3 days' limit 1`,
+    `select 1 from dossier_sections l
+      where l.isin = $1 and l.section = 'ledger' and l.built_at > now() - interval '3 days'
+        and exists (select 1 from dossier_sections a where a.isin = l.isin and a.section = 'annual_reports')
+      limit 1`,
     [company.isin],
   );
   if (fresh.length) redirect(`/research/${company.symbol}`);

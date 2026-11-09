@@ -1,0 +1,46 @@
+{
+ "bull": [
+  {
+   "point": "₹1,78,650 crore was the FY26 revenue from operations, up 9.6% on the year before as profit for the year reached ₹29,474 crore.",
+   "facts": [
+    "F1",
+    "F2"
+   ]
+  },
+  {
+   "point": "₹57,003 crore in dividends and buybacks was distributed over FY25-26, representing 88.1% of total free cash flow of ₹64,716 crore.",
+   "facts": [
+    "F7"
+   ]
+  },
+  {
+   "point": "₹33,986 crore of FY26 operating cash flow represented 115.3% of the profit for the year.",
+   "facts": [
+    "F3"
+   ]
+  }
+ ],
+ "bear": [
+  {
+   "point": "₹31,259 crore of free cash flow in FY26 was lower than ₹33,457 crore in FY25.",
+   "facts": [
+    "F4",
+    "F6"
+   ]
+  },
+  {
+   "point": "95.2% of turnover came from Software and IT consulting, a segment facing pressure as AI transformation shifts discretionary spending dynamics.",
+   "facts": [
+    "F8",
+    "F13"
+   ]
+  },
+  {
+   "point": "97.4% of turnover came from exports, while management reported that policy changes and geopolitical uncertainties weighed on the tech services industry.",
+   "facts": [
+    "F9",
+    "F12"
+   ]
+  }
+ ]
+}

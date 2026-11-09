@@ -1,0 +1,16 @@
+{
+ "firm": "Deloitte Haskins & Sells LLP",
+ "matters": [
+  {
+   "title": "Revenue recognition",
+   "quote": "As certain contracts with customers involve management’s judgment in (1) identifying distinct performance obligations, (2) determining whether the Group is acting as a principal or an agent and (3) whether fixed-price maintenance revenue is recognized on a straight-line basis or using the percentage of completion method, revenue recognition from these judgments were identified as a key audit matter and required a higher extent of audit effort.",
+   "page": 278
+  },
+  {
+   "title": "Revenue recognition using percentage of completion",
+   "quote": "We identified the estimate of total efforts or costs to complete fixed-price contracts measured using the percentage of completion method as a key audit matter as the estimation of total efforts or costs involves significant judgement and is assessed throughout the period of the contract to reflect any changes based on the latest available information.",
+   "page": 279
+  }
+ ],
+ "emphasis": []
+}

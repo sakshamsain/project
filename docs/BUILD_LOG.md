@@ -115,3 +115,33 @@ Three lines a day: what was asked, what went wrong, what changed.
   finished, so its cookie never arrived; the test now waits. Next.js's route announcer
   also carries role="alert", so tests target the form's own message. The local sandbox
   cannot open TCP to Neon, so accounts were tested on the deployed site.
+
+## Mon 9 Nov 2026 (Day 1): the annual-report Dossier
+
+- **Asked:** "build the next feature of app". The brief wants research grounded in
+  annual reports as well as call transcripts, and the Dossier only read transcripts.
+- **Changed:** the last two annual reports for any NSE company, read from NSE's feed; the
+  statements, auditor's report, BRSR and MD&A found on the page; a Cash tab (three years
+  of operating cash flow, capex, free cash flow, conversion and payouts, every sum made
+  by code and every year checked); Snapshot (what the company does, from BRSR, and the
+  year in figures); Trajectory (three years by year, eight quarters by quarter); the
+  auditor's opinion, key audit matters and emphasis paragraphs; the risks management
+  names; and a bull and bear case written only from checked facts. Research pages became
+  six tabs, and every citation opens the stored page with the quote marked. Built for
+  INFY, TCS, HCLTECH, DIXON and BAJFINANCE; FY26 revenue and profit from each report
+  matched the sum of its four quarterly XBRL filings. 235 worker tests, 2 web tests.
+- **Went wrong:** HCLTech's statement titles come out of the PDF at the bottom of the
+  page; Dixon reports in lakh as "` / Lakhs"; Bajaj Finance's auditor heading is an
+  image; one PDF drops the "t" of "report". Dixon's cash-flow range ran onto the
+  statement of changes in equity and the model took a dividend from it, so figures must
+  now be the first two in their row and a statement stops where the next begins. The
+  model read Infosys's "Tax expense:" heading as a line (headings are now refused) and
+  once left out a buyback, so summed lines are cross-checked by code. In production it
+  added TCS's lease advances to capex (₹109 crore), so code must also recognise every
+  summed line. The model client's cache handed an escalated retry the weaker model's
+  answer; escalation now skips other models' cache. The first bull and bear points all
+  failed the figure check because the model wrote "(F1)" into its sentences.
+- **Next:** evals for the annual-report extraction (line recall against hand-checked
+  statements, case faithfulness); segment revenue from the segment note; delivery
+  statements for promises the filings cannot measure; the covering note.
+

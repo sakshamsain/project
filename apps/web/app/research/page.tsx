@@ -13,7 +13,7 @@ const SHOWN: LedgerStatus[] = ["delivered", "on_track", "off_track", "missed", "
 const ERRORS: Record<string, string> = {
   symbol: "Type an NSE symbol, such as TCS or ASIANPAINT.",
   unknown: "That symbol is not listed on NSE.",
-  limit: "This device has asked for 10 new ledgers today; ledgers already built stay open to all.",
+  limit: "This device has asked for 10 new dossiers today; dossiers already built stay open to all.",
 };
 
 export default async function Research({
@@ -33,9 +33,9 @@ export default async function Research({
           <span className="kept">and what it delivered</span>
         </p>
         <p className="triage-sub">
-          FINN reads each company&apos;s last four earnings-call transcripts on NSE, quotes every
-          promise with its page, and checks it against the quarterly figures the company filed.
-          Nothing else goes in: no news, no broker notes.
+          A dossier on any NSE company from what it filed: its last four earnings-call transcripts and
+          its last two annual reports. Every promise, figure and risk is quoted with its page and
+          checked; nothing else goes in, no news and no broker notes.
         </p>
       </section>
 
@@ -58,22 +58,22 @@ export default async function Research({
             required
           />
           <button className="button" type="submit">
-            Build ledger
+            Build dossier
           </button>
         </form>
         {error && ERRORS[error] && <p className="notice">{ERRORS[error]}</p>}
         <p className="section-note">
-          FINN reads the company&apos;s last four call transcripts and its filed results; it takes
-          about a minute.
+          FINN reads the company&apos;s last four call transcripts, its last two annual reports and its
+          filed results; it takes two to three minutes.
         </p>
       </section>
 
       <section className="section" aria-labelledby="ledgers">
         <h2 className="section-title" id="ledgers">
-          Promise ledgers <span className="n">{ledgers.length}</span>
+          Dossiers <span className="n">{ledgers.length}</span>
         </h2>
         {ledgers.length === 0 ? (
-          <p className="empty">No ledgers built yet.</p>
+          <p className="empty">No dossiers built yet.</p>
         ) : (
           <ul className="lines">
             {ledgers.map((l) => {
@@ -101,13 +101,15 @@ export default async function Research({
 
       <section className="section prose" aria-labelledby="how">
         <h2 className="section-title" id="how">
-          How a promise is checked
+          How the dossier is checked
         </h2>
         <ol>
           <li>A model lists management&apos;s forward-looking statements and copies each one word for word.</li>
           <li>FINN keeps a statement only if those exact words are in the transcript, and takes its page from the text.</li>
           <li>A figure is kept only if it appears in the quote; segment targets and adjusted figures are marked as such.</li>
           <li>Code computes the result for the period from the company&apos;s quarterly XBRL filings and compares it with the promise.</li>
+          <li>From the annual reports, figures are copied by a model and kept only where code finds them in the right row of the statement; code then adds them up, and a year whose cash flows do not reconcile shows no figures at all.</li>
+          <li>The bull and bear case is written only from those checked facts, and a point is dropped if it states a figure its facts do not contain.</li>
         </ol>
       </section>
     </main>

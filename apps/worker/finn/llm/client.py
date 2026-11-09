@@ -160,15 +160,19 @@ class Llm:
         """The first model in the tier whose answer parses and validates."""
         input_hash = hashlib.sha256(f"{system}\x00{user}".encode()).hexdigest()
         specs = tier_models(tier)
+        cache_specs = specs
         if escalate and (e := escalation(tier)):
             specs = [e, *specs]
+            # Escalating means the tier's answer was not good enough: only the stronger
+            # model's own earlier answer will do.
+            cache_specs = [e]
 
         def cache_key(spec: ModelSpec) -> str:
             return hashlib.sha256(
                 f"{task}|{prompt_version}|{spec.model}|{input_hash}".encode()
             ).hexdigest()
 
-        for spec in specs:  # any model's earlier answer to the same input will do
+        for spec in cache_specs:  # any model's earlier answer to the same input will do
             cached = self._store.get(cache_key(spec))
             if cached is not None:
                 self._log(task, tier, spec, prompt_version, input_hash, 0, 0, 0, True, True, None)
