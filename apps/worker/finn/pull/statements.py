@@ -23,40 +23,57 @@ from finn.pull.annual_reports import numbered, parse_figure, statement_scale
 from finn.pull.quotes import normalize
 from finn.push.results_math import StatementLines, pct_change
 
-PROMPT_VERSION = "statements-v1"
+PROMPT_VERSION = "statements-v2"
 SINGLE = [
     "revenue",
     "pbt",
     "tax",
     "pat",
     "pat_owners",
+    "finance_costs",
+    "depreciation",
     "cfo",
     "cfi",
     "cff",
     "fx_effect",
     "net_change",
+    "equity",
+    "borrowings_noncurrent",
+    "borrowings_current",
+    "cash",
+    "bank_balances",
+    "current_investments",
+    "receivables",
+    "inventories",
+    "total_assets",
+    "total_equity_liabilities",
 ]
-MULTI = ["capex", "dividends", "buyback"]
+MULTI = ["capex", "dividends", "buyback", "payables"]
 KEYS = SINGLE + MULTI
 WINDOW = 160  # characters after a label in which its row's figures must appear
 
-SYSTEM = """You read the statement of profit and loss and the statement of cash flows \
-from the annual report of a company listed in India. Use only the pages you are given.
+SYSTEM = """You read the balance sheet, the statement of profit and loss and the \
+statement of cash flows from the annual report of a company listed in India. Use only \
+the pages you are given.
 List the lines below where they appear. For each line give:
 - key: one of the keys below
 - label: the line's label exactly as printed, without its note number
-- current: the figure in the column for the year the report covers
+- current: the figure in the column for the year the report covers (for the balance \
+sheet, as at the end of that year)
 - prior: the figure in the column for the year before
 - page: the number in the [[page N]] marker above the line
 Copy each figure character for character as printed, with its commas, decimals and \
 brackets, for example "2,67,021", "(12,845)" or "72,776.01". Write "-" where the column \
 shows a dash. Never add, convert, round or compute anything.
-Keys:
+Profit and loss:
 - revenue: revenue from operations (for a lender, total revenue from operations)
 - pbt: profit before tax
 - tax: total tax expense
 - pat: profit for the year
 - pat_owners: profit for the year attributable to owners of the company
+- finance_costs: finance costs
+- depreciation: depreciation and amortisation expense
+Cash flows:
 - cfo: net cash from or used in operating activities
 - cfi: net cash from or used in investing activities
 - cff: net cash from or used in financing activities
@@ -67,7 +84,21 @@ intangible assets; one item for each such line
 - dividends: dividends paid, one item for each line (to owners, to non-controlling \
 interests)
 - buyback: payments to buy back shares, with their tax and expenses; one item per line
-Give each of the first ten keys at most once; leave out any the statements do not show."""
+Balance sheet:
+- equity: total equity (including non-controlling interests where the sheet shows them)
+- borrowings_noncurrent: borrowings under non-current liabilities (not lease liabilities)
+- borrowings_current: borrowings under current liabilities (not lease liabilities)
+- cash: cash and cash equivalents
+- bank_balances: bank balances other than cash and cash equivalents
+- current_investments: investments under current assets
+- receivables: trade receivables under current assets
+- inventories: inventories
+- payables: trade payables under current liabilities, one item per line (dues of micro \
+and small enterprises, dues of others)
+- total_assets: total assets
+- total_equity_liabilities: total equity and liabilities
+Give each key except capex, dividends, buyback and payables at most once; leave out any \
+the statements do not show."""
 
 SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -109,6 +140,9 @@ class Extracted:
     # without them would be wrong, so it is not made.
     incomplete: dict[str, list[str]] = field(default_factory=dict)
     added: list[str] = field(default_factory=list)  # summed lines code read itself
+    # Lines a balance sheet does not print at all, read by code from its pages: a sheet
+    # with no "borrowings" anywhere is debt-free, not missing a line.
+    absent: list[str] = field(default_factory=list)
 
 
 def _shape(data: Any) -> None:
@@ -203,7 +237,9 @@ def matched_row(current: Any, prior: Any, rows: Sequence[str]) -> tuple[float | 
     return None
 
 
-def verify_lines(data: Any, pages: Mapping[int, str]) -> Extracted:
+def verify_lines(
+    data: Any, pages: Mapping[int, str], balance_pages: Sequence[int] = ()
+) -> Extracted:
     unit = statement_scale([pages[n] for n in sorted(pages)])
     if unit is None:
         return Extracted([], None, ["no unit printed on the statement pages"])
@@ -246,7 +282,15 @@ def verify_lines(data: Any, pages: Mapping[int, str]) -> Extracted:
         )
     out.added = add_code_rows(out.lines, pages, scale)
     out.incomplete = missing_lines(out.lines, pages, scale)
+    sheet = " ".join(normalize(pages[n]) for n in balance_pages if n in pages)
+    if sheet:
+        out.absent = [key for key, word in _ABSENT_WORDS.items() if word not in sheet]
     return out
+
+
+# A balance-sheet line that is not printed at all is zero; one printed but not read is
+# unknown. Code tells the two apart by the word on the sheet.
+_ABSENT_WORDS = {"borrowings": "borrowing", "inventories": "inventor"}
 
 
 # Lines that are summed: code finds them itself, checks the model listed each one, and
@@ -259,6 +303,7 @@ _SUMMED = {
     ),
     "dividends": re.compile(r"dividends? paid|payments? of (?:final |interim )?dividends?"),
     "buyback": re.compile(r"buy ?-?back"),
+    "payables": re.compile(r"trade payables|outstanding dues of"),
 }
 
 
@@ -394,7 +439,12 @@ def missing_lines(
 
 
 def extract_statements(
-    llm: Llm, pages: Mapping[int, str], company: str, fiscal_year: str, basis: str
+    llm: Llm,
+    pages: Mapping[int, str],
+    company: str,
+    fiscal_year: str,
+    basis: str,
+    balance_pages: Sequence[int] = (),
 ) -> tuple[Extracted, str]:
     year = 2000 + int(fiscal_year[2:])
     user = (
@@ -414,7 +464,7 @@ def extract_statements(
             validate=_shape,
             escalate=escalate,
         )
-        ex = verify_lines(res.data, pages)
+        ex = verify_lines(res.data, pages, balance_pages)
         score = quality(ex, fiscal_year)
         if best is None or score > best[0]:
             best = (score, ex, res.model)
@@ -455,6 +505,7 @@ class Year:
     document_id: int | None = None
     scale: float = 1.0  # crore per printed unit, for rounding tolerance
     incomplete: list[str] = field(default_factory=list)  # summed keys missing a line
+    absent: list[str] = field(default_factory=list)  # lines the balance sheet does not print
 
     def get(self, key: str) -> float | None:
         if key in self.incomplete:
@@ -471,7 +522,16 @@ def years_from(ex: Extracted, fiscal_year: str, document_id: int | None) -> list
     prior_fy = f"FY{int(fiscal_year[2:]) - 1:02d}"
     out = []
     for fy, pick in ((fiscal_year, "current"), (prior_fy, "prior")):
-        y = Year(fy, {}, {}, {}, document_id, _scale(ex), list(ex.incomplete.get(pick, [])))
+        y = Year(
+            fy,
+            {},
+            {},
+            {},
+            document_id,
+            _scale(ex),
+            list(ex.incomplete.get(pick, [])),
+            list(ex.absent),
+        )
         for line in ex.lines:
             v = getattr(line, pick)
             if v is None:
@@ -551,10 +611,93 @@ class CashYear:
     failures: list[str]
     quarters: dict[str, Any]
     withheld: list[str] = field(default_factory=list)  # sums not made: a line was missing
+    balance: dict[str, float | None] = field(default_factory=dict)
+    balance_failures: list[str] = field(default_factory=list)
+
+
+BALANCE_KEYS = (
+    "equity",
+    "borrowings_noncurrent",
+    "borrowings_current",
+    "cash",
+    "bank_balances",
+    "current_investments",
+    "receivables",
+    "inventories",
+    "total_assets",
+    "total_equity_liabilities",
+)
+
+
+def balance_year(y: Year, lender: bool) -> tuple[dict[str, float | None], list[str]]:
+    """Balance-sheet figures and the ratios code makes from them, for one year-end.
+
+    Shown only if total assets equal total equity and liabilities. Working-capital days
+    are on revenue (the year-end balance over the year's revenue, times 365), since the
+    statements give no cost of goods sold in one line. Return on capital employed is
+    EBIT (profit before tax plus finance costs) over year-end equity plus borrowings.
+    Lenders get equity and assets only: debt and working capital mean other things for
+    a bank or an NBFC."""
+    v = y.values
+    if not any(k in v for k in BALANCE_KEYS):
+        return {}, []
+    failures: list[str] = []
+    assets, liabilities = v.get("total_assets"), v.get("total_equity_liabilities")
+    if assets is None or liabilities is None:
+        failures.append("balance_sheet_totals_missing")
+    elif not _close(assets, liabilities, y.scale, rel=0.001):
+        failures.append("balance_sheet_does_not_balance")
+    equity = v.get("equity")
+    if equity is not None and assets is not None and abs(equity) > assets * 1.0001:
+        failures.append("equity_larger_than_assets")
+    out: dict[str, float | None] = {"equity": equity, "total_assets": assets}
+    if lender or failures:
+        return out, failures
+
+    def r(x: float | None, digits: int = 0) -> float | None:
+        return None if x is None else round(x, digits)
+
+    if "borrowings_noncurrent" in v or "borrowings_current" in v:
+        debt: float | None = v.get("borrowings_noncurrent", 0.0) + v.get("borrowings_current", 0.0)
+    else:
+        debt = 0.0 if "borrowings" in y.absent else None
+    liquid = None
+    if "cash" in v:
+        liquid = v["cash"] + v.get("bank_balances", 0.0) + v.get("current_investments", 0.0)
+    revenue = v.get("revenue")
+
+    def days(x: float | None) -> float | None:
+        return None if x is None or not revenue or revenue <= 0 else round(x / revenue * 365)
+
+    inventories = v.get("inventories", 0.0 if "inventories" in y.absent else None)
+    rec, inv, pay = days(v.get("receivables")), days(inventories), days(y.get("payables"))
+    ebit = v["pbt"] + v["finance_costs"] if "pbt" in v and "finance_costs" in v else None
+    finance = v.get("finance_costs")
+    capital = None if equity is None or debt is None else equity + debt
+    out.update(
+        debt=r(debt, 2),
+        liquid=r(liquid, 2),
+        net_debt=None if debt is None or liquid is None else round(debt - liquid, 2),
+        debt_to_equity=None
+        if debt is None or not equity or equity <= 0
+        else round(debt / equity, 2),
+        receivable_days=rec,
+        inventory_days=inv,
+        payable_days=pay,
+        cash_cycle_days=None if None in (rec, inv, pay) else (rec or 0) + (inv or 0) - (pay or 0),
+        interest_cover=None
+        if ebit is None or not finance or finance <= 0
+        else round(ebit / finance, 1),
+        roce_pct=None
+        if ebit is None or not capital or capital <= 0
+        else round(ebit / capital * 100, 1),
+    )
+    return out, failures
 
 
 def cash_year(y: Year, before: Year | None, lender: bool, failures: list[str]) -> CashYear:
     v = y.values
+    balance, balance_failures = balance_year(y, lender)
     pat = v.get("pat", v.get("pat_owners"))
     cfo = v.get("cfo")
     capex = y.get("capex")
@@ -588,6 +731,8 @@ def cash_year(y: Year, before: Year | None, lender: bool, failures: list[str]) -
         failures=failures,
         quarters={},
         withheld=list(y.incomplete),
+        balance=balance,
+        balance_failures=balance_failures,
     )
 
 

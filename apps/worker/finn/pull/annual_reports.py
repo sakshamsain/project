@@ -131,6 +131,7 @@ _TITLES = {
         r"statement of profit (?:and|&) loss|profit (?:and|&) loss (?:statement|account)"
     ),
     "cash_flow": re.compile(r"statement of cash ?flows?|cash ?flow statement"),
+    "balance_sheet": re.compile(r"balance sheet"),
 }
 _ANCHORS = {
     "profit_and_loss": re.compile(
@@ -138,8 +139,10 @@ _ANCHORS = {
         r"|income from operations"
     ),
     "cash_flow": re.compile(r"operating activities"),
+    "balance_sheet": re.compile(r"total assets|equity and liabilities|capital and liabilities"),
 }
 _ENDS = {
+    "balance_sheet": re.compile(r"total equity and liabilities|total capital and liabilities"),
     "profit_and_loss": re.compile(r"earnings per (?:equity )?share"),
     "cash_flow": re.compile(
         r"cash and cash equivalents,? (?:as )?at (?:the )?(?:end|close) of (?:the )?(?:year|period)"
@@ -147,11 +150,23 @@ _ENDS = {
         r"|closing (?:balance of )?cash and cash equivalents"
     ),
 }
-_MAX_STATEMENT_PAGES = {"profit_and_loss": 2, "cash_flow": 3}
+_MAX_STATEMENT_PAGES = {"profit_and_loss": 2, "cash_flow": 3, "balance_sheet": 2}
 _AUDITOR_HEAD = re.compile(r"independent auditor|to the members of")
-_OTHER_STATEMENT = re.compile(
-    r"statement of changes in equity|balance sheet|notes? (?:to|forming part of)"
-)
+_NOTES_OR_EQUITY = r"statement of changes in equity|notes? (?:to|forming part of)"
+# What ends a statement: the title of a different one at the top of the next page.
+_OTHER_STATEMENT = {
+    "profit_and_loss": re.compile(
+        _NOTES_OR_EQUITY + r"|balance sheet|statement of cash ?flows?|cash ?flow statement"
+    ),
+    "cash_flow": re.compile(
+        _NOTES_OR_EQUITY + r"|balance sheet|statement of profit|profit (?:and|&) loss account"
+    ),
+    "balance_sheet": re.compile(
+        _NOTES_OR_EQUITY
+        + r"|statement of profit|profit (?:and|&) loss account|statement of cash ?flows?"
+        r"|cash ?flow statement"
+    ),
+}
 _AUDIT_OF = {
     True: re.compile(
         r"\brepor\w* on (?:the )?audit of (?:the )?consolidated (?:ind ?as )?financial statements"
@@ -233,7 +248,7 @@ def statement_pages(
             and j + 1 < len(flats)
             and len(pages) < _MAX_STATEMENT_PAGES[kind]
             and figure_count(flats[j + 1]) >= MIN_FIGURES // 2
-            and not _OTHER_STATEMENT.search(flats[j + 1][:HEAD])
+            and not _OTHER_STATEMENT[kind].search(flats[j + 1][:HEAD])
             and not _AUDITOR_HEAD.search(flats[j + 1][:HEAD])
         ):
             j += 1
@@ -308,6 +323,7 @@ class Sections:
     profit_and_loss: list[int] = field(default_factory=list)
     cash_flow: list[int] = field(default_factory=list)
     auditor: list[int] = field(default_factory=list)
+    balance_sheet: list[int] = field(default_factory=list)
     business: list[int] = field(default_factory=list)
     mdna: list[int] = field(default_factory=list)
     risks: list[int] = field(default_factory=list)
@@ -318,6 +334,7 @@ class Sections:
         for part in (
             self.profit_and_loss,
             self.cash_flow,
+            self.balance_sheet,
             self.auditor,
             self.business,
             self.risks,
@@ -329,6 +346,7 @@ class Sections:
         return {
             "profit_and_loss": self.profit_and_loss,
             "cash_flow": self.cash_flow,
+            "balance_sheet": self.balance_sheet,
             "auditor": self.auditor,
             "business": self.business,
             "mdna": [self.mdna[0], self.mdna[-1]] if self.mdna else [],
@@ -344,11 +362,15 @@ def find_sections(pages: Sequence[str], outline: Sequence[tuple[int, str, int]] 
         start = audit or 0
         cash = statement_pages(flats, "cash_flow", consolidated, start)
         pl = statement_pages(flats, "profit_and_loss", consolidated, start)
+        bs = statement_pages(flats, "balance_sheet", consolidated, start)
         if not (cash or pl) and audit is not None:  # statements before the report
             cash = statement_pages(flats, "cash_flow", consolidated)
             pl = statement_pages(flats, "profit_and_loss", consolidated)
+            bs = statement_pages(flats, "balance_sheet", consolidated)
         if cash or pl:
-            first = min([*cash, *pl])
+            if bs and pl and not (pl[0] - 4 <= bs[0] <= pl[0] + 6):
+                bs = []  # a balance sheet sits beside its profit and loss statement
+            first = min([*cash, *pl, *bs])
             auditor: list[int] = []
             if audit is not None:
                 stop = first - 1 if first - 1 > audit else audit + AUDITOR_PAGES
@@ -358,6 +380,7 @@ def find_sections(pages: Sequence[str], outline: Sequence[tuple[int, str, int]] 
                 profit_and_loss=pl,
                 cash_flow=cash,
                 auditor=auditor,
+                balance_sheet=bs,
             )
             break
     mdna = mdna_pages(flats, outline)
@@ -367,6 +390,7 @@ def find_sections(pages: Sequence[str], outline: Sequence[tuple[int, str, int]] 
         profit_and_loss=base.profit_and_loss,
         cash_flow=base.cash_flow,
         auditor=base.auditor,
+        balance_sheet=base.balance_sheet,
         business=business_pages(flats),
         mdna=mdna,
         risks=risk_pages(flats, mdna),

@@ -132,6 +132,49 @@ def cash_facts(cash: Mapping[str, Any]) -> list[Fact]:
                     pages.get("capex") or pages.get("cfo"),
                 )
             )
+    latest = next((r for r in rows if r.get("balance") and not r.get("balance_failures")), None)
+    if latest is not None and not cash.get("lender"):
+        b, fy = latest["balance"], latest["fiscal_year"]
+        end = f"31 March 20{fy[2:]}"
+        if b.get("net_debt") is not None:
+            if b["net_debt"] <= 0:
+                text = (
+                    f"At {end}, cash and liquid investments exceeded borrowings by "
+                    f"₹{crore(-b['net_debt'])} crore (net cash)."
+                )
+            else:
+                text = (
+                    f"At {end}, borrowings exceeded cash and liquid investments by "
+                    f"₹{crore(b['net_debt'])} crore"
+                    + (
+                        f"; debt was {b['debt_to_equity']:g} times equity."
+                        if b.get("debt_to_equity") is not None
+                        else "."
+                    )
+                )
+            out.append(Fact("", text, "computed", latest["document_id"], None))
+        if b.get("roce_pct") is not None:
+            out.append(
+                Fact(
+                    "",
+                    f"{fy} return on capital employed was {pct(b['roce_pct'])}% (profit before "
+                    "tax and finance costs over year-end equity and borrowings).",
+                    "computed",
+                    latest["document_id"],
+                    None,
+                )
+            )
+        if b.get("receivable_days") is not None:
+            out.append(
+                Fact(
+                    "",
+                    f"At {end}, trade receivables equalled {b['receivable_days']:g} days of "
+                    f"{fy} revenue.",
+                    "computed",
+                    latest["document_id"],
+                    None,
+                )
+            )
     t = cash.get("totals") or {}
     years = cash.get("years_in_totals") or []
     if t.get("payout") is not None and t.get("payout_of_fcf_pct") is not None:
@@ -356,12 +399,15 @@ def build_annual(
     statement_notes: list[dict[str, Any]] = []
     for r in read:
         assert r.sections is not None
-        pm = pages_for(r.pages, r.sections.profit_and_loss + r.sections.cash_flow)
+        sec = r.sections
+        pm = pages_for(r.pages, sec.balance_sheet + sec.profit_and_loss + sec.cash_flow)
         if not pm:
             continue
-        say(f"Checking the {r.ref.fiscal_year} profit and cash-flow statements")
+        say(f"Checking the {r.ref.fiscal_year} balance sheet, profit and cash flows")
         try:
-            ex, model = extract_statements(llm, pm, name, r.ref.fiscal_year, r.sections.basis)
+            ex, model = extract_statements(
+                llm, pm, name, r.ref.fiscal_year, sec.basis, sec.balance_sheet
+            )
         except LlmError as exc:
             statement_notes.append({"fiscal_year": r.ref.fiscal_year, "error": str(exc)[:300]})
             continue
