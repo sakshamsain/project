@@ -335,6 +335,8 @@ def build_annual(
     refs = find_reports(src, symbol)
     reports: list[ReadReport] = []
     for ref in refs:
+        if sum(r.status == "read" for r in reports) >= 2:
+            break  # the third report is only a fallback for one that cannot be read
         say(f"Reading the {ref.fiscal_year} annual report")
         r = read_report(src, ref)
         if r.status == "read":

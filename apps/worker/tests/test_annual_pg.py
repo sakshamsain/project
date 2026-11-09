@@ -58,7 +58,8 @@ def test_build_annual_stores_each_section(infy: str, monkeypatch: pytest.MonkeyP
         said.append,
         date(2026, 11, 9),
     )
-    assert result["read"] == 1 and result["annual_reports"] == 2
+    # FY26 read; FY25 missing, so FY24 is tried as the fallback and is missing too.
+    assert result["read"] == 1 and result["annual_reports"] == 3
     assert transport.tasks == ["statements", "business", "auditor", "risks", "case"]
     assert said[0] == "Finding annual reports on NSE"
     with connect(infy) as conn:
@@ -75,7 +76,11 @@ def test_build_annual_stores_each_section(infy: str, monkeypatch: pytest.MonkeyP
             [ISIN],
         )
     assert set(sections) == {"annual_reports", "cash", "business", "auditor", "risks", "case"}
-    assert [r["status"] for r in sections["annual_reports"]["reports"]] == ["read", "missing"]
+    assert [r["status"] for r in sections["annual_reports"]["reports"]] == [
+        "read",
+        "missing",
+        "missing",
+    ]
     assert doc[0]["doc_type"] == "annual_report" and doc[0]["period"] == "FY26"
     assert doc[0]["pages"] == 384 and 0 < doc[0]["kept"] < 30  # only the pages read
     cash = sections["cash"]
@@ -97,7 +102,7 @@ def test_a_company_without_readable_reports_keeps_only_sources(
     result = annual.build_annual(
         infy, Listing(), llm, ISIN, "Infosys Limited", "INFY", {}, False, lambda m: None
     )
-    assert result == {"annual_reports": 2, "read": 0}
+    assert result == {"annual_reports": 3, "read": 0}
     assert transport.tasks == []
     with connect(infy) as conn:
         rows = fetch_all(conn, "select section from dossier_sections where isin = %s", [ISIN])

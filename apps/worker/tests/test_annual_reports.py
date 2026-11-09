@@ -35,7 +35,7 @@ def test_figures_are_read_signed_and_a_dash_is_not_a_minus() -> None:
     # "- 28": a nil column, then 28 -- not minus 28. "2025-26" is two years, not -26.
     assert figures_on("sale of shares - 28") == [28.0]
     assert figures_on("fiscal 2025-26 (1,861) -40") == [2025.0, 26.0, -1861.0, -40.0]
-    assert figure_count("2,67,021 2,55,324 4,402 12 2026") == 3
+    assert figure_count("2,67,021 2,55,324 4,402 (473) 2026") == 4  # years do not count
 
 
 def test_unit_is_read_from_the_word_whatever_the_rupee_glyph() -> None:
@@ -108,3 +108,18 @@ def test_only_read_pages_are_kept() -> None:
     assert 295 in kept and 143 in kept and 277 in kept
     assert len(kept) < 30
     assert set(kept) <= set(page_map("INFY_FY26"))
+
+
+def test_a_report_too_large_or_unfetchable_is_skipped_not_fatal() -> None:
+    from finn.pull.annual_reports import read_report
+    from finn.sources.nse import AnnualReport, NseError
+
+    class Big:
+        def annual_reports(self, symbol: str) -> object:
+            return {}
+
+        def fetch_bytes(self, url: str, max_bytes: int = 0) -> bytes | None:
+            raise NseError(f"{url}: 253443410 bytes is over the {max_bytes} limit")
+
+    ref = AnnualReport("FY25", "https://nsearchives.nseindia.com/x.pdf", None, False, 0)
+    assert read_report(Big(), ref).status == "too large"

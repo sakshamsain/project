@@ -255,7 +255,7 @@ _SUMMED = {
     "capex": re.compile(
         r"(?:purchase|acquisition|payments?|expenditure|additions?|investment)s? "
         r"(?:of |on |for |in |towards |to )?[^.;:]{0,30}?"
-        r"(?:property|plant and equipment|capital work|intangible|fixed assets)"
+        r"(?:property|plant and equipment|capital work|intangible|fixed assets|capital assets)"
     ),
     "dividends": re.compile(r"dividends? paid|payments? of (?:final |interim )?dividends?"),
     "buyback": re.compile(r"buy ?-?back"),

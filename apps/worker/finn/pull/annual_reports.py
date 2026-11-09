@@ -24,14 +24,19 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from finn.core.db import Conn, copy_upsert, fetch_all
-from finn.sources.nse import AnnualReport, latest_annual_reports, parse_annual_reports
+from finn.sources.nse import (
+    AnnualReport,
+    NseError,
+    latest_annual_reports,
+    parse_annual_reports,
+)
 from finn.sources.pdf import NotAPdf, pdf_text
 
-MAX_BYTES = 80_000_000
+MAX_BYTES = 300_000_000  # Larsen & Toubro's FY25 report is 253 MB
 MAX_PAGES = 900
 HEAD = 500  # characters at the top of a page where a statement's title sits
 TAIL = 350
-MIN_FIGURES = 20  # a statement page carries dozens of figures; a page that cites one does not
+MIN_FIGURES = 30  # a statement page carries dozens of figures; a page that cites one does not
 MAX_MDNA_PAGES = 40
 AUDITOR_PAGES = 7
 
@@ -44,12 +49,13 @@ def flat(text: str) -> str:
 
 # A minus sign only directly before a digit: "- 28" in a statement is a nil column and 28.
 _TOKEN = re.compile(r"(?<![\w,.])(\()?(-)?(\d[\d,]*(?:\.\d+)?)(\))?")
-_GROUPED = re.compile(r"\d{1,3}(?:,\d{2,3})+(?:\.\d+)?|\b\d+\.\d{1,2}\b")
 
 
 def figure_count(text: str) -> int:
-    """Figures printed the way statements print them: 2,67,021 or 72,776.01."""
-    return len(_GROUPED.findall(text))
+    """How many figures a page prints, years aside. A statement prints dozens (as
+    2,67,021, 72,776.01 or, in a smaller company's crore, 615 and (473)); prose that
+    mentions a statement prints a handful."""
+    return sum(1 for v in figures_on(text) if not (v == int(v) and 1990 <= v <= 2039))
 
 
 def figures_on(text: str) -> list[float]:
@@ -81,6 +87,10 @@ def parse_figure(text: Any) -> float | None:
 
 
 _UNIT_WORD = r"(crores?|cr\b|lakhs?|lacs?|millions?|mn\b|thousands?|billions?)"
+# Banks print in thousands: "(` in '000)", "(c in ‘000)", "(000s omitted)".
+_UNIT_THOUSANDS = re.compile(
+    r"\(\s*\S{0,3}\s*in\s+['\u2018\u2019`]000s?\s*\)|\(\s*000s?\s+omitted\s*\)"
+)
 _UNIT_PAREN = re.compile(r"\(([^()]{0,60}?)\b" + _UNIT_WORD + r"[^()]{0,60}\)")
 _UNIT_PLAIN = re.compile(r"\b(?:in|amounts? in|figures in)\s+(?:\S{1,3}\s*)?" + _UNIT_WORD)
 _UNIT_MARK = re.compile(r"(?:[`\u20b9]|\brs\.?|\binr\b)\s*/?\s*(?:in\s+)?" + _UNIT_WORD)
@@ -103,6 +113,8 @@ def statement_scale(texts: Sequence[str]) -> tuple[str, float] | None:
     crore)", "(In ` crore)"), so the unit is read from the word."""
     for text in texts:
         f = flat(text)
+        if _UNIT_THOUSANDS.search(f[:HEAD]):
+            return "thousand", SCALE_TO_CRORE["thousand"]
         for pattern in (_UNIT_PAREN, _UNIT_MARK, _UNIT_PLAIN):
             m = pattern.search(f)
             if m:
@@ -122,7 +134,8 @@ _TITLES = {
 }
 _ANCHORS = {
     "profit_and_loss": re.compile(
-        r"revenue from operations|total income|interest income|income from operations"
+        r"revenue from operations|total income|interest income|interest earned"
+        r"|income from operations"
     ),
     "cash_flow": re.compile(r"operating activities"),
 }
@@ -130,10 +143,12 @@ _ENDS = {
     "profit_and_loss": re.compile(r"earnings per (?:equity )?share"),
     "cash_flow": re.compile(
         r"cash and cash equivalents,? (?:as )?at (?:the )?(?:end|close) of (?:the )?(?:year|period)"
+        r"|cash and cash equivalents,? (?:as )?at (?:31|march)"
         r"|closing (?:balance of )?cash and cash equivalents"
     ),
 }
 _MAX_STATEMENT_PAGES = {"profit_and_loss": 2, "cash_flow": 3}
+_AUDITOR_HEAD = re.compile(r"independent auditor|to the members of")
 _OTHER_STATEMENT = re.compile(
     r"statement of changes in equity|balance sheet|notes? (?:to|forming part of)"
 )
@@ -160,6 +175,10 @@ _MDNA = re.compile(
 _RISK_WORDS = re.compile(r"\brisks?\b|\bthreats?\b|\bconcerns?\b|headwinds?|uncertaint")
 
 
+# What a statement's title is not: a schedule or a note to it ("schedules to the
+# consolidated profit and loss account", "notes forming part of the...").
+_NOT_TITLE = re.compile(r"(?:schedules?|notes?|forming part of)\b[^.;:]{0,25}$")
+
 # A title set as a heading, wherever the PDF puts it (mid-page on a two-page spread): next
 # to its period or its unit, unlike a mention in running text ("...the Consolidated
 # Statement of Profit and Loss (including other comprehensive income)...").
@@ -172,14 +191,21 @@ _HEADING_AFTER = re.compile(
 
 def _titled(page: str, kind: str, consolidated: bool) -> bool:
     """The statement's title at the top of the page, at the bottom (where some PDFs put
-    the text of a page's heading), or anywhere it is set as a heading."""
+    the text of a page's heading), or anywhere it is set as a heading. "Schedules to the
+    profit and loss account" and "notes to..." are not the statement itself."""
     for part in (page[:HEAD], page[-TAIL:]):
         for m in _TITLES[kind].finditer(part):
-            named = "consolidated" in part[max(0, m.start() - 30) : m.start()]
+            before = part[max(0, m.start() - 40) : m.start()]
+            if _NOT_TITLE.search(before):
+                continue
+            named = "consolidated" in before[-30:]
             if named == consolidated and (consolidated or "consolidated" not in part):
                 return True
     for m in _TITLES[kind].finditer(page):
-        named = "consolidated" in page[max(0, m.start() - 30) : m.start()]
+        before40 = page[max(0, m.start() - 40) : m.start()]
+        if _NOT_TITLE.search(before40):
+            continue
+        named = "consolidated" in before40[-30:]
         if named != consolidated or (not consolidated and "consolidated" in page[:HEAD]):
             continue
         before = page[max(0, m.start() - 70) : m.start()].replace("consolidated", "").rstrip()
@@ -208,6 +234,7 @@ def statement_pages(
             and len(pages) < _MAX_STATEMENT_PAGES[kind]
             and figure_count(flats[j + 1]) >= MIN_FIGURES // 2
             and not _OTHER_STATEMENT.search(flats[j + 1][:HEAD])
+            and not _AUDITOR_HEAD.search(flats[j + 1][:HEAD])
         ):
             j += 1
             pages.append(j + 1)
@@ -370,11 +397,17 @@ class ReadReport:
 
 
 def find_reports(src: AnnualReportSource, symbol: str, years: int = 2) -> list[AnnualReport]:
-    return latest_annual_reports(parse_annual_reports(src.annual_reports(symbol)), years)
+    """The last `years` reports, and one more to fall back on if one cannot be read."""
+    return latest_annual_reports(parse_annual_reports(src.annual_reports(symbol)), years + 1)
 
 
 def read_report(src: AnnualReportSource, ref: AnnualReport) -> ReadReport:
-    data = src.fetch_bytes(ref.url, max_bytes=MAX_BYTES)
+    """One report read and its parts located; a report that cannot be fetched or read
+    gets a status saying why, and the caller falls back to an older one."""
+    try:
+        data = src.fetch_bytes(ref.url, max_bytes=MAX_BYTES)
+    except NseError as exc:
+        return ReadReport(ref, "too large" if "limit" in str(exc) else "not fetched")
     if data is None:
         return ReadReport(ref, "missing")
     try:

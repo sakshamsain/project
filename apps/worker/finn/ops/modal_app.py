@@ -37,7 +37,7 @@ image = (
 )
 secrets = [modal.Secret.from_name("finn-env")]
 IST = "Asia/Kolkata"
-REPORT_MEMORY_MB = 2048  # parsing a 500-page annual report
+REPORT_MEMORY_MB = 4096  # a 250 MB, 700-page annual report in memory
 
 
 def _setup() -> str:
