@@ -113,7 +113,12 @@ export default async function DossierPage({
         )}
         <p className="triage-sub">
           From {reports.length ? `${reports.length === 1 ? "one annual report" : `${reports.length} annual reports`} and ` : ""}
-          {read.length} earnings calls filed with NSE, and nothing else.
+          {read.length} earnings calls filed with NSE
+          {read.length > 0 && read.every((t) => t.filing_url)
+            ? " through links to the company\u2019s website"
+            : read.some((t) => t.filing_url)
+              ? " (some through a link to the company\u2019s website)"
+              : ""}, and nothing else.
         </p>
         {!sections.annual_reports && (
           <form action={requestLedger} className="row-form">

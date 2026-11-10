@@ -14,6 +14,8 @@ export type TranscriptEntry = {
   period: string;
   filed_on: string;
   url: string;
+  /** set when the NSE filing only linked to the transcript on the company's website */
+  filing_url?: string;
   status: string;
   pages?: number;
   promises?: number;

@@ -80,6 +80,14 @@ export default function Sources({
                   {t.status === "read"
                     ? `${t.pages} pages, ${t.promises} promises kept${t.dropped_quotes ? `, ${t.dropped_quotes} dropped because the quote was not in the text` : ""}`
                     : t.status}
+                  {t.filing_url && (
+                    <>
+                      {" "}· from the company&rsquo;s website, linked in its{" "}
+                      <a href={t.filing_url} target="_blank" rel="noopener noreferrer">
+                        NSE filing
+                      </a>
+                    </>
+                  )}
                 </span>
               </div>
             </li>
@@ -87,7 +95,7 @@ export default function Sources({
         </ul>
       </section>
       <p className="section-note">
-        FINN reads only what the company filed with NSE: no news, broker notes or outside data.
+        FINN reads only what the company filed with NSE, and transcripts its NSE filings link to: no news, broker notes or outside data.
         {builtOn ? ` Built ${fmtDay(builtOn.slice(0, 10))}.` : ""}
       </p>
     </>
