@@ -1585,9 +1585,24 @@ a.dir-name:hover {
   list-style: none;
   overflow-x: auto;
   scrollbar-width: none;
-  /* a fade at the edge says the strip scrolls */
+  /* a fade at an edge says more tabs lie that way (ActiveTab sets data-more) */
   -webkit-mask-image: linear-gradient(to right, #000 85%, transparent);
   mask-image: linear-gradient(to right, #000 85%, transparent);
+}
+
+.dtabs ul[data-more="none"] {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+.dtabs ul[data-more="start"] {
+  -webkit-mask-image: linear-gradient(to left, #000 85%, transparent);
+  mask-image: linear-gradient(to left, #000 85%, transparent);
+}
+
+.dtabs ul[data-more="both"] {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
 }
 
 .dtabs ul::-webkit-scrollbar {
