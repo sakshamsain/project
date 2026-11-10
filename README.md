@@ -48,14 +48,17 @@ computed, are in [`docs/EVALS.md`](docs/EVALS.md).
 - **Ranking uses no model.** Every filing is ranked by rules and code. In the last 30
   days, 6 in 10 events were folded as routine and 1 in 5 made *Read first*.
 - **Results cards:** every card built passed its consistency checks.
-- **Statements from annual reports:** 98.5% of fiscal years read pass every accounting
+- **Statements from annual reports:** 97.8% of fiscal years read pass every accounting
   identity; every balance sheet shown balances; full-year figures match the four
-  quarterly filings in 12 of 13 years compared (the one that differs is withheld).
+  quarterly filings in 20 of 21 years compared (the one that differs is withheld).
 - **Promise Ledger:** no promise is shown in words the company did not use. About 1 in 12
   candidate quotes was dropped because it was not verbatim on its page.
-- **Ten companies it had never seen**, picked at random: see the generalisation table in
-  `docs/EVALS.md`.
-- **Cost:** models run on free tiers; at list prices a Dossier costs well under a cent.
+- **Ten companies it had never seen**, drawn at random: 8 got statements and a bull and
+  bear case (the other 2 have no annual report on NSE); all 7 that file call transcripts
+  got a Promise Ledger. This run found that some companies file only a letter linking to
+  the transcript on their website; FINN now follows that link and cites the transcript.
+- **Cost:** models run on free tiers. At list prices a Dossier costs about 6 US cents,
+  and the Brief and Pulse cost nothing because they use no model.
 
 ## How it is built
 
@@ -116,7 +119,8 @@ Operations, schedules and health checks: [`docs/RUNBOOK.md`](docs/RUNBOOK.md).
   wins, store counts); these are shown as *not in the filings* rather than guessed.
 - Banks and NBFCs get the ledger and Snapshot, but their annual revenue is not compared
   with the quarterly filings, which report it differently.
-- A company with no annual report on NSE gets a Dossier without the Cash and Bull vs bear tabs.
+- A company with no annual report on NSE gets a Dossier without the Cash and Bull vs bear
+  tabs; one that files no call transcripts gets no Promise Ledger.
 - Not investment advice: FINN reports what was filed and computes from it.
 
 ## How this was built
