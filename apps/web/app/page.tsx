@@ -2,15 +2,23 @@ import Link from "next/link";
 import Masthead from "@/components/Masthead";
 import { Line, Routine, Story } from "@/components/brief";
 import Intro from "@/components/Intro";
-import { WINDOWS, fmtClock, fmtDay, parseWindow } from "@/lib/format";
+import { cookies } from "next/headers";
+import LastVisit, { PREV_VISIT } from "@/components/LastVisit";
+import { MAX_RANGE_DAYS, WINDOWS, fmtClock, fmtDay, istDay, parseWindow } from "@/lib/format";
 import { currentProfile } from "@/lib/profile";
 import { countHoldings, getBrief, getComingUp } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
-export default async function Today({ searchParams }: { searchParams: Promise<{ w?: string }> }) {
-  const { w } = await searchParams;
-  let win = parseWindow(w);
+export default async function Today({
+  searchParams,
+}: {
+  searchParams: Promise<{ w?: string; from?: string; to?: string }>;
+}) {
+  const { w, from, to } = await searchParams;
+  const prev = Number((await cookies()).get(PREV_VISIT)?.value);
+  const lastVisit = Number.isFinite(prev) && prev > 0 ? new Date(prev) : null;
+  let win = parseWindow(w, new Date(), { lastVisit, from, to });
   const profile = await currentProfile();
   let [rows, upcoming, holdings] = await Promise.all([
     getBrief(profile.id, win.from, win.to),
@@ -24,6 +32,7 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
     rows = await getBrief(profile.id, win.from, win.to);
     widened = true;
   }
+  const today = istDay(new Date());
   const front = rows.filter((r) => r.tier === "front");
   const brief = rows.filter((r) => r.tier === "oneliner");
   const routine = rows.filter((r) => r.tier === "folded");
@@ -64,6 +73,13 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
 
       <nav aria-label="Time window">
         <ul className="windows">
+          {lastVisit && (
+            <li>
+              <Link href="/?w=since" aria-current={win.key === "since" ? "page" : undefined}>
+                Since last visit
+              </Link>
+            </li>
+          )}
           {WINDOWS.map((x) => (
             <li key={x.key}>
               <Link
@@ -74,8 +90,31 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
               </Link>
             </li>
           ))}
+          <li>
+            <details>
+              <summary className={win.key === "range" ? "on" : undefined}>
+                {win.key === "range" ? win.phrase.replace(/^on |^from /, "") : "Pick dates"}
+              </summary>
+              <form className="range-form" action="/" method="get">
+                <input type="hidden" name="w" value="range" />
+                <label>
+                  From
+                  <input type="date" name="from" required max={today} defaultValue={from ?? today} />
+                </label>
+                <label>
+                  To
+                  <input type="date" name="to" max={today} defaultValue={to ?? today} />
+                </label>
+                <button className="button small" type="submit">
+                  Show
+                </button>
+                <p className="field-hint">Up to {MAX_RANGE_DAYS} days, by date of filing in IST.</p>
+              </form>
+            </details>
+          </li>
         </ul>
       </nav>
+      <LastVisit />
 
       {front.length > 0 && (
         <section className="section" aria-labelledby="front">

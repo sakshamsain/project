@@ -209,6 +209,8 @@ export type Move = {
   linked_headline: string | null;
   linked_category: string | null;
   hits: Hit[];
+  /** Closes for the 20 sessions up to and including this one, oldest first. */
+  closes?: number[];
 };
 
 type MoveRow = Omit<Move, "hits"> & Hit;
@@ -275,6 +277,18 @@ export async function getPulse(profileId: string, t: Thresholds, sessions = 5) {
   const moves = [...grouped.values()]
     .map((m) => ({ ...m, hits: m.hits.filter((h) => passes(h, t, m.hits)) }))
     .filter((m) => m.hits.length > 0);
+  if (moves.length) {
+    const trail = await query<{ isin: string; trade_date: string; closes: number[] }>(
+      `select m.isin, m.d::text as trade_date,
+              array(select p.close::float8 from eod_prices p
+                     where p.isin = m.isin and p.trade_date <= m.d
+                     order by p.trade_date desc limit 20) as closes
+         from unnest($1::text[], $2::date[]) as m(isin, d)`,
+      [moves.map((m) => m.isin), moves.map((m) => m.trade_date)],
+    );
+    const byKey = new Map(trail.map((r) => [`${r.isin}${r.trade_date}`, r.closes.slice().reverse()]));
+    for (const m of moves) m.closes = byKey.get(`${m.isin}${m.trade_date}`);
+  }
   return { days: days.map((d) => d.d), moves };
 }
 

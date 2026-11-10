@@ -5,8 +5,10 @@ import { useEffect, useState } from "react";
 
 const KEY = "finn_intro_seen";
 
+/** A first-visit explainer, folded to one line so the brief stays on the first screen. */
 export default function Intro() {
   const [show, setShow] = useState(false);
+  const [open, setOpen] = useState(false);
   useEffect(() => {
     try {
       setShow(window.localStorage.getItem(KEY) !== "1");
@@ -24,21 +26,21 @@ export default function Intro() {
     setShow(false);
   }
   return (
-    <aside className="panel intro" aria-label="How FINN works">
-      <p className="building-title">How FINN works</p>
-      <ul>
-        <li>Every filing your companies make on NSE, ranked: read first, in brief, or routine.</li>
+    <details className="panel intro" open={open} onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>
+      <summary>New here? How FINN works</summary>
+      <ol>
+        <li>Today ranks every filing your companies make on NSE: read first, in brief, or routine.</li>
         <li>After the close, Pulse flags unusual moves and the filing behind each one.</li>
-        <li>Research checks what management promised on calls against what it reported.</li>
-      </ul>
+        <li>Research checks what management promised on calls against what the company then filed.</li>
+      </ol>
       <div className="row-form">
         <button type="button" className="button small" onClick={dismiss}>
           Got it
         </button>
-        <Link className="button ghost small" href="/settings" onClick={dismiss} style={{ textDecoration: "none" }}>
+        <Link className="button ghost small" href="/settings" onClick={dismiss}>
           Use my own portfolio
         </Link>
       </div>
-    </aside>
+    </details>
   );
 }

@@ -21,8 +21,25 @@ export type CashYear = {
   document_id: number | null;
   failures: string[];
   withheld: string[];
+  /** Year-end balance-sheet figures and ratios, computed by the worker; absent in older dossiers. */
+  balance?: Partial<Record<BalanceKey, number | null>>;
+  balance_failures?: string[];
   quarters: { status?: string; revenue?: { annual: number; quarters: number }; pat?: { annual: number; quarters: number } };
 };
+
+export type BalanceKey =
+  | "equity"
+  | "total_assets"
+  | "borrowings"
+  | "cash_and_bank"
+  | "net_debt"
+  | "debt_to_equity"
+  | "receivable_days"
+  | "inventory_days"
+  | "payable_days"
+  | "cash_cycle_days"
+  | "interest_cover"
+  | "roce_pct";
 
 export type CashBody = {
   lender: boolean;

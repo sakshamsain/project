@@ -24,23 +24,42 @@ function describe(h: Hit): string {
   }
 }
 
+/** The closes leading up to the move, the move's own session marked: enough to see
+ *  whether it broke a trend or continued one. */
+function Spark({ closes, up }: { closes: number[]; up: boolean }) {
+  if (closes.length < 5) return null;
+  const lo = Math.min(...closes);
+  const hi = Math.max(...closes);
+  const span = hi - lo || 1;
+  const x = (i: number) => 2 + (i / (closes.length - 1)) * 100;
+  const y = (v: number) => 38 - ((v - lo) / span) * 34;
+  const d = closes.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
+  const last = closes.length - 1;
+  return (
+    <svg className="spark" viewBox="0 0 104 42" role="img" aria-label={`Last ${closes.length} closes`}>
+      <path className="trail" d={d} />
+      <circle className={`now ${up ? "up" : "down"}`} cx={x(last)} cy={y(closes[last])} r="4" />
+    </svg>
+  );
+}
+
 function MoveRow({ m }: { m: Move }) {
   const ret = m.return_pct;
+  const facts = m.hits.filter((h) => h.kind !== "price_move");
   return (
     <li className="move">
-      <Ticker symbol={m.symbol} />
-      <div className="move-facts">
+      <div className="move-head">
+        <Ticker symbol={m.symbol} />
         {ret != null && (
-          <span className={ret < 0 ? "down" : "up"}>
+          <span className={`move-ret ${ret < 0 ? "down" : "up"}`}>
             {ret < 0 ? "▼" : "▲"} {fmtPct(ret)}
           </span>
         )}
-        {m.hits
-          .filter((h) => h.kind !== "price_move")
-          .map((h) => (
-            <span key={h.kind}>{describe(h)}</span>
-          ))}
       </div>
+      {m.closes && ret != null && <Spark closes={m.closes} up={ret >= 0} />}
+      <p className="move-facts">
+        {facts.length ? facts.map((h) => describe(h)).join("; ") : "Price move past your limit"}
+      </p>
       {m.linked_event_id ? (
         <p className="move-why">
           Filed that session:{" "}

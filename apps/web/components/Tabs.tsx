@@ -73,10 +73,18 @@ function useUnread(path: string): number {
 export default function Tabs() {
   const path = usePathname();
   const unread = useUnread(path);
-  const active = (href: string) =>
-    href === "/" ? path === "/" || path.startsWith("/event") || path.startsWith("/company") : path.startsWith(href);
+  // Which section a page belongs to: a filing opens from Today, a source from Research.
+  const active = (href: string) => {
+    if (href === "/") return path === "/" || path.startsWith("/event");
+    if (href === "/research") return path.startsWith("/research") || path.startsWith("/source");
+    if (href === "/settings") return ["/settings", "/signin", "/status"].some((x) => path.startsWith(x));
+    return path.startsWith(href);
+  };
   return (
     <nav className="tabs" aria-label="Sections">
+      <Link className="wordmark rail-brand" href="/" aria-label="FINN, today's brief">
+        FINN
+      </Link>
       <ul>
         {TABS.map((t) => (
           <li key={t.href}>
@@ -94,6 +102,9 @@ export default function Tabs() {
           </li>
         ))}
       </ul>
+      <p className="rail-foot">
+        Filings from NSE, nothing else. <Link href="/status">Sources and freshness</Link>
+      </p>
     </nav>
   );
 }

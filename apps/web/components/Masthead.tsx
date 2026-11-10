@@ -1,7 +1,9 @@
 import Link from "next/link";
 import type { SessionUser } from "@/lib/auth";
 
-export default function Masthead({ user, note }: { user?: SessionUser | null; note?: string }) {
+/** The top of every page: FINN's stamp on a phone (on a wide screen it sits in the rail),
+ *  search and the account. `note` is kept for callers; the tab bar says where you are. */
+export default function Masthead({ user }: { user?: SessionUser | null; note?: string }) {
   const initial = user ? (user.name || user.email).trim().charAt(0).toUpperCase() : null;
   return (
     <header className="masthead">
@@ -9,7 +11,6 @@ export default function Masthead({ user, note }: { user?: SessionUser | null; no
         FINN
       </Link>
       <div className="mast-right">
-        {note && <span className="dateline">{note}</span>}
         <Link href="/search" className="icon-btn" aria-label="Find a company">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <g fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">

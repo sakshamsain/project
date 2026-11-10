@@ -1,5 +1,5 @@
 import Cite from "./Cite";
-import type { CashBody, CashNote, CashYear } from "@/lib/dossier";
+import type { BalanceKey, CashBody, CashNote, CashYear } from "@/lib/dossier";
 import { fmtCrore, fmtShare } from "@/lib/format";
 
 type Row = { key: keyof CashYear; label: string; computed?: boolean; pct?: boolean };
@@ -46,6 +46,110 @@ function cell(y: CashYear, r: Row): string {
   const v = y[r.key];
   if (typeof v !== "number") return "–";
   return r.pct ? fmtShare(v) : fmtCrore(v);
+}
+
+type BalanceRow = { key: BalanceKey; label: string; kind: "crore" | "times" | "pct" | "days"; computed?: boolean };
+
+const BALANCE_ROWS: BalanceRow[] = [
+  { key: "equity", label: "Total equity", kind: "crore" },
+  { key: "borrowings", label: "Borrowings", kind: "crore" },
+  { key: "cash_and_bank", label: "Cash and bank balances", kind: "crore" },
+  { key: "net_debt", label: "Net debt", kind: "crore", computed: true },
+  { key: "debt_to_equity", label: "Borrowings ÷ equity", kind: "times", computed: true },
+  { key: "interest_cover", label: "Interest cover", kind: "times", computed: true },
+  { key: "roce_pct", label: "Return on capital employed", kind: "pct", computed: true },
+  { key: "receivable_days", label: "Receivable days", kind: "days", computed: true },
+  { key: "inventory_days", label: "Inventory days", kind: "days", computed: true },
+  { key: "payable_days", label: "Payable days", kind: "days", computed: true },
+  { key: "cash_cycle_days", label: "Cash cycle, days", kind: "days", computed: true },
+];
+const LENDER_BALANCE_ROWS: BalanceRow[] = [
+  { key: "equity", label: "Total equity", kind: "crore" },
+  { key: "total_assets", label: "Total assets", kind: "crore" },
+];
+
+const BALANCE_FAILURE: Record<string, string> = {
+  balance_sheet_does_not_balance: "total assets do not equal total equity and liabilities as FINN read them",
+  balance_sheet_totals_missing: "the balance sheet's totals could not both be read",
+  equity_not_below_assets: "equity as read is not below total assets",
+};
+
+function balanceCell(v: number | null | undefined, kind: BalanceRow["kind"]): string {
+  if (typeof v !== "number") return "–";
+  if (kind === "crore") return fmtCrore(v);
+  if (kind === "pct") return fmtShare(v);
+  if (kind === "times") return `${v.toLocaleString("en-IN", { maximumFractionDigits: v >= 10 ? 1 : 2 })}×`;
+  return v.toLocaleString("en-IN");
+}
+
+function Balance({ cash }: { cash: CashBody }) {
+  const years = cash.years.filter((y) => y.balance && Object.keys(y.balance).length > 0).reverse();
+  if (years.length === 0) return null;
+  const rows = (cash.lender ? LENDER_BALANCE_ROWS : BALANCE_ROWS).filter((r) =>
+    years.some((y) => typeof y.balance?.[r.key] === "number"),
+  );
+  const failing = years.filter((y) => (y.balance_failures ?? []).length > 0);
+  const netCash = years.some((y) => (y.balance?.net_debt ?? 0) < 0);
+  return (
+    <section className="section" aria-labelledby="balance">
+      <h2 className="section-title" id="balance">
+        Balance sheet <span className="n">at 31 March, ₹ crore, {cash.basis ?? "as filed"}</span>
+      </h2>
+      <div className="ctable-wrap">
+        <table className="ctable">
+          <thead>
+            <tr>
+              <th scope="col">
+                <span className="visually-hidden">Line</span>
+              </th>
+              {years.map((y) => (
+                <th scope="col" key={y.fiscal_year}>
+                  {y.fiscal_year}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.key} className={r.computed ? "computed" : undefined}>
+                <th scope="row">
+                  {r.label}
+                  {r.computed && <span className="visually-hidden"> (computed by FINN)</span>}
+                </th>
+                {years.map((y) => (
+                  <td key={y.fiscal_year} className={(y.balance_failures ?? []).length ? "na" : undefined}>
+                    {(y.balance_failures ?? []).length ? "–" : balanceCell(y.balance?.[r.key], r.kind)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {failing.map((y) => (
+        <p className="notice" key={y.fiscal_year}>
+          <strong>{y.fiscal_year}: numbers need a look.</strong>{" "}
+          {(y.balance_failures ?? []).map((f) => BALANCE_FAILURE[f] ?? f).join("; ")}, so FINN shows none of this
+          year-end&apos;s figures.
+        </p>
+      ))}
+      {cash.lender ? (
+        <p className="section-note" style={{ marginTop: "0.6rem" }}>
+          For a bank or an NBFC, borrowings fund the loan book and receivables are the business, so FINN does not
+          compute debt or working-capital ratios.
+        </p>
+      ) : (
+        <p className="section-note" style={{ marginTop: "0.6rem" }}>
+          Shown only when total assets equal total equity and liabilities as read. Net debt is borrowings less cash
+          and bank balances; investments are not netted off{netCash ? ", and a negative figure is net cash" : ""}.
+          Interest cover is profit before tax and finance costs over finance costs; return on capital employed puts
+          the same profit over year-end equity plus borrowings. Days are year-end balances over the year&apos;s
+          revenue, times 365; receivables include unbilled amounts where the sheet lists them under trade
+          receivables. A dash means a line could not be read with certainty.
+        </p>
+      )}
+    </section>
+  );
 }
 
 export default function Cash({ cash, urls }: { cash?: CashBody; urls: Record<string, string> }) {
@@ -164,6 +268,7 @@ export default function Cash({ cash, urls }: { cash?: CashBody; urls: Record<str
           </ul>
         )}
       </section>
+      <Balance cash={cash} />
     </>
   );
 }

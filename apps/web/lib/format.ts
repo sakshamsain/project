@@ -78,7 +78,35 @@ export const WINDOWS: { key: WindowKey; label: string; phrase: string; hours: nu
   { key: "30d", label: "30 days", phrase: "in the last 30 days", hours: 720 },
 ];
 
-export function parseWindow(w: string | undefined, now: Date = new Date()) {
+export type Window = { key: string; label: string; phrase: string; from: Date; to: Date };
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+export const MAX_RANGE_DAYS = 92;
+
+/** The Brief's window: a preset, "since" the last visit on this device, or a "range"
+ *  of IST calendar days (both ends included, at most 92 days, nothing in the future). */
+export function parseWindow(
+  w: string | undefined,
+  now: Date = new Date(),
+  opts: { lastVisit?: Date | null; from?: string; to?: string } = {},
+): Window {
+  if (w === "since" && opts.lastVisit && opts.lastVisit < now) {
+    const from = new Date(Math.max(opts.lastVisit.getTime(), now.getTime() - 30 * 86_400_000));
+    return { key: "since", label: "Since last visit", phrase: `since your last visit (${fmtDay(from)}, ${fmtClock(from)} IST)`, from, to: now };
+  }
+  if (w === "range" && opts.from && DAY.test(opts.from)) {
+    const to = opts.to && DAY.test(opts.to) ? opts.to : opts.from;
+    const [a, b] = opts.from <= to ? [opts.from, to] : [to, opts.from];
+    let from = new Date(`${a}T00:00:00+05:30`);
+    const end = new Date(Math.min(new Date(`${b}T00:00:00+05:30`).getTime() + 86_400_000, now.getTime()));
+    if (end.getTime() - from.getTime() > MAX_RANGE_DAYS * 86_400_000) {
+      from = new Date(end.getTime() - MAX_RANGE_DAYS * 86_400_000);
+    }
+    if (from < end) {
+      const phrase = a === b ? `on ${fmtDay(a)}` : `from ${fmtDay(a)} to ${fmtDay(b)}`;
+      return { key: "range", label: "Dates", phrase, from, to: end };
+    }
+  }
   const win = WINDOWS.find((x) => x.key === w) ?? WINDOWS[0];
   return { ...win, from: new Date(now.getTime() - win.hours * 3_600_000), to: now };
 }
