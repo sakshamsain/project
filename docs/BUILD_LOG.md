@@ -154,3 +154,25 @@ Three lines a day: what was asked, what went wrong, what changed.
   statements, case faithfulness); segment revenue from the segment note; delivery
   statements for promises the filings cannot measure; the covering note.
 
+## Tue 10 Nov 2026 (Day 2): balance sheet, redesign, evals
+
+- **Asked:** "build the remaining app the user interface should look good".
+- **Changed:** the balance sheet, read and checked like the other statements (it must
+  balance), with net debt, debt to equity, working-capital days, interest cover and ROCE
+  computed in code. Results now check a company's open promises the moment they are
+  filed, and dossiers made stale by a new filing rebuild overnight (02:40). A redesign: a
+  new palette and type, a left rail on wide screens, tier colours, sparklines on Pulse,
+  an Inbox with an unread count. The Brief gained *since last visit* and a date range of
+  up to 92 days. `evals/run_evals.py` measures production and writes `docs/EVALS.md`;
+  a runbook, the AI build history and a README for submission.
+- **Went wrong:** the redesign's tab-bar selector also matched the rail's links, so on a
+  phone the tab bar showed only the wordmark; caught from a phone screenshot and scoped.
+  Several styles were lost in the rewrite (holdings, calendar, inbox items) and Pulse's
+  markup no longer matched its CSS; both restored. The first eval run priced every call
+  at $0 because the model list had no prices; list prices are now in `models.yaml`. The
+  case model failed about half its calls (rate limits and schema misses) and fell back to
+  the next model, which is slow but never shows an unchecked point. Deploying the web app
+  failed: the Vercel token cannot see the team that owns the project, so production still
+  shows the previous interface until the token is replaced.
+- **Next:** web deploy once Vercel access is fixed; the Ask bar; the covering note.
+

@@ -1,111 +1,127 @@
 # FINN
 
-A mobile-first financial investment agent that works like an editor with a memory.
+A mobile-first investment agent for Indian equities. It reads what NSE companies file
+and tells you two things: what in today's filings deserves your attention, and whether
+management has done what it said it would.
 
-- **The Brief (push):** every filing across your portfolio for a window you choose,
-  grouped into events and ranked into three tiers. Results arrive as a Revenue, EBITDA,
-  PBT and PAT card with QoQ and YoY; management changes arrive as a card on the incoming
-  person; end-of-day price and volume alerts fire on thresholds you set.
-- **The Dossier (pull):** any NSE ticker becomes a cited research view built only from
-  annual reports, results and concall transcripts, centred on a **Promise Ledger** of what
-  management guided against what it delivered.
+**Live:** https://finn-blue.vercel.app. Open it on a phone. It starts on a demo portfolio
+of 18 NSE companies. Add or remove one and your device gets its own copy; create an
+account to keep it on every device. Add it to the home screen for push alerts.
 
-**Live:** https://finn-blue.vercel.app (opens on a demo portfolio of 18 NSE companies;
-add or remove one and your device gets its own copy, or create an account to keep it on
-every device).
+| The Brief | Pulse | Promise Ledger | Cash | Bull vs bear |
+|---|---|---|---|---|
+| ![Brief](docs/screens/brief.png) | ![Pulse](docs/screens/pulse.png) | ![Promises](docs/screens/promises.png) | ![Cash](docs/screens/cash.png) | ![Bull vs bear](docs/screens/case.png) |
 
-What is in the app: the Brief (Today), Pulse (end-of-day moves), company pages with
-interactive price and quarterly results charts, a Dossier for any NSE company (Research:
-Snapshot, Trajectory, Promises, Cash, Bull vs bear, Sources), results and people cards,
-notifications, accounts, and search. Every quote and figure in a Dossier links to the
-page of the filing it came from, with the words marked.
+## What the brief asked for, and where it is
 
-> Status: build week, 8–15 Nov 2026. This README grows with the build; see
-> `docs/BUILD_LOG.md` for progress.
+| Requirement | In FINN |
+|---|---|
+| Digest of portfolio filings for a window, prioritised | **Today**: 24 hours by default; 3, 7 or 30 days, *since last visit*, or any dates up to 92 days. Every filing is grouped into an event and ranked into *Read first*, *One line* and *Routine* (folded). |
+| Alerts on material announcements | Push notifications for *Read first* events, held during quiet hours (22:00–07:00) and released at 07:00; every alert also lands in the **Inbox**. |
+| End-of-day volume and price alerts, configurable | **Pulse**: after the close every listed stock is checked against its 20-day volume, a daily price move and a move in standard deviations. Thresholds are set in **Settings**. Each move is tied to the filing that explains it, or marked as unexplained. |
+| Management change → background of the incoming person | A people card: role, effective date, the background stated in the filing, and other boards held, each with its page. A LinkedIn search link, never a scrape. |
+| Results → Revenue, EBITDA, PBT, PAT with QoQ and YoY | A results card built from the NSE XBRL filing, consolidated where filed. Code does all the arithmetic and checks it reconciles, otherwise the card says *Numbers need a look* and links the filing. |
+| Research on any NSE ticker from annual reports and concall transcripts | **Research**: type any symbol. A Dossier is built in a few minutes from the last 2 annual reports and the last 4 earnings-call transcripts, and nothing else. |
+| Hero example: last 4 quarters, promised vs delivered | The **Promise Ledger**: each forward-looking statement quoted word for word with its page, then checked by code against the figures the company later filed. |
 
-## Repository
+Every quote and figure in a Dossier links to the page of the filing it came from, with
+the words highlighted.
 
-| Path | What lives there |
-| --- | --- |
-| `apps/worker` | Python workers on Modal: ingestion, push pipeline, research engine |
-| `apps/web` | Next.js PWA on Vercel (read path only) |
-| `db/migrations` | Postgres schema, shared by both runtimes |
-| `docs` | Decisions, build log, runbook |
+## The Dossier, tab by tab
+
+- **Snapshot**: what the company does (its BRSR filing), FY figures with the year's change, and the Promise Ledger headline.
+- **Trajectory**: the last eight quarters of revenue (net interest income for lenders) and profit from XBRL, and three years from the annual reports, as interactive charts.
+- **Promises**: the ledger. Delivered, missed, on track, off track, too early, or *not in the filings* when the filings don't report the measure.
+- **Cash**: three years of cash flow, capex, free cash flow, dividends and buybacks, balance sheet, working-capital days, interest cover, ROCE. A year is shown only if its cash flows add up to the change in cash, profit before tax less tax equals profit, and the full year matches the four quarterly XBRL filings.
+- **Bull vs bear**: up to three points each way, written from a numbered list of facts code has already checked; a point that cites no fact, or states a figure its facts don't contain, is dropped.
+- **Sources**: every document read, with its date and link.
+
+Dossiers rebuild overnight when a new result, transcript or annual report arrives. When a
+company files results, FINN checks them against that company's open promises, and the
+outcome shows on the results card.
+
+## How well it works
+
+Measured from production by `evals/run_evals.py`; the full tables, with how each number is
+computed, are in [`docs/EVALS.md`](docs/EVALS.md).
+
+- **Ranking uses no model.** Every filing is ranked by rules and code. In the last 30
+  days, 6 in 10 events were folded as routine and 1 in 5 made *Read first*.
+- **Results cards:** every card built passed its consistency checks.
+- **Statements from annual reports:** 98.5% of fiscal years read pass every accounting
+  identity; every balance sheet shown balances; full-year figures match the four
+  quarterly filings in 12 of 13 years compared (the one that differs is withheld).
+- **Promise Ledger:** no promise is shown in words the company did not use. About 1 in 12
+  candidate quotes was dropped because it was not verbatim on its page.
+- **Ten companies it had never seen**, picked at random: see the generalisation table in
+  `docs/EVALS.md`.
+- **Cost:** models run on free tiers; at list prices a Dossier costs well under a cent.
+
+## How it is built
+
+```
+NSE (announcements, XBRL, annual reports, bhavcopy)
+        │  every 5 min / after the close / nightly
+        ▼
+Python worker on Modal ──► Neon Postgres ◄── Next.js PWA on Vercel (read only)
+  rules, scoring, parsers,          ▲              │
+  models for extraction only        └── push ──────┘ Web Push to the phone
+```
+
+- `apps/worker`: Python 3.12 on Modal: ingestion, the push pipeline, the research engine.
+- `apps/web`: Next.js PWA on Vercel. It reads Postgres directly and never calls Python on
+  the read path, so a page loads in one query, not one model call.
+- `db/migrations`: the schema, the contract between the two. Append-only.
+- `evals`, `fixtures`: the eval runner and recorded NSE payloads, PDFs' pages and model answers used by tests.
+
+## Design rules
+
+1. **Code computes every number.** Models extract, classify and phrase; ratios, QoQ/YoY,
+   margins and scores are code with unit tests.
+2. **Rules before models.** `finn/push/rules.yaml` classifies filings; models are chosen by
+   tier in `models.yaml`, with a fallback when one is rate-limited.
+3. **Grounded.** Every quote must be found on its page (`verify_quote`) or it is dropped.
+   Prompts are closed-book.
+4. **Holdings never enter a prompt.** Only public filings go to models; personalisation is
+   in SQL.
+5. **Never show a wrong number.** A figure that fails a check is replaced by *Numbers need
+   a look* and a link to the filing.
+
+The reasons behind these and 20 other choices are in [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
 ## Run it
 
 ```bash
-# worker: tests (database tests need a local Postgres with pgvector)
+# worker: tests (database tests need a local Postgres with pgvector; unset, they skip)
 cd apps/worker
 uv sync --group dev --extra ingest --extra db --extra push --extra docs
 FINN_TEST_DATABASE_URL=postgresql:///postgres uv run pytest -q
+uv run ruff check . && uv run mypy
 
-# worker: deploy schedules, backfill, replay after a rules change
+# worker: deploy schedules and build a dossier (keys live in a file outside the repo)
 export FINN_ENV_FILE=~/.secrets/finn.env
 uv run python -m finn.ops.envrun modal deploy -m finn.ops.modal_app
-uv run python -m finn.ops.envrun modal run -m finn.ops.modal_app::backfill
+uv run python -m finn.ops.envrun modal run -m finn.ops.modal_app::dossier --symbol INFY
 
 # web
-cd apps/web && npm install && npm run build
+cd apps/web && npm install && npm run build && npm start
 ```
 
-## How the Brief is made
+Operations, schedules and health checks: [`docs/RUNBOOK.md`](docs/RUNBOOK.md).
 
-1. Every 5 minutes the worker reads NSE's announcements for the day and archives the raw rows.
-2. Each filing is classified by `rules.yaml` (93% of real filings match a rule); the
-   rest are marked for the small model.
-3. Filings of one company and family within a window (3 days for results, 2 for board
-   changes) become one event; press releases never merge.
-4. Each event is scored: category weight, size, price reaction, novelty, with floors for
-   top-management or auditor exits, downgrades and pledge increases.
-5. `brief()` in Postgres ranks a profile's events for the chosen window: at most five on
-   the front page, the rest in brief or folded as routine.
-6. After the close, every listed stock is checked for unusual volume, price and delivery;
-   each move is tied to the filing that explains it, or flagged as unexplained.
+## Limits
 
-## Design rules
+- NSE only. BSE-only companies and filings made only to BSE are not seen.
+- Most promises are about things quarterly filings do not report (order inflow, deal
+  wins, store counts); these are shown as *not in the filings* rather than guessed.
+- Banks and NBFCs get the ledger and Snapshot, but their annual revenue is not compared
+  with the quarterly filings, which report it differently.
+- A company with no annual report on NSE gets a Dossier without the Cash and Bull vs bear tabs.
+- Not investment advice: FINN reports what was filed and computes from it.
 
-Code computes every number; rules classify before models do; model output is grounded
-in primary filings with page citations; holdings never enter a prompt. See
-`docs/DECISIONS.md`.
+## How this was built
 
-
-## How the Promise Ledger is made
-
-1. For any NSE symbol, the worker finds the last four earnings-call transcripts filed with
-   NSE (AGM and investor-day transcripts are skipped) and stores each page's text.
-2. A model lists management's forward-looking promises, copying each sentence word for
-   word with its page.
-3. Code keeps a promise only if the sentence is in the transcript, keeps a figure only if
-   it appears in the sentence, requires the sentence to name the measure, and marks
-   segment targets and adjusted figures.
-4. Code computes the result for the promised period from the company's quarterly XBRL
-   filings and marks it delivered, missed, on track, off track, too early, or not in the
-   filings, with the comparison written out.
-5. Type a symbol on the Research tab and a ledger is built in about a minute.
-
-## How the annual-report half of the Dossier is made
-
-1. The worker takes the last two annual reports from NSE's annual-report feed (a revision
-   replaces the original) and reads every page of each, 300 to 600 of them.
-2. It finds the parts it needs by what is on the page, not by page number: the
-   consolidated statement of profit and loss and statement of cash flows (title near the
-   top or bottom of the page, dozens of figures), the independent auditor's report (its
-   heading, or its opening paragraph when the heading is an image), BRSR Section A
-   (SEBI's fixed format for what a company does) and the MD&A (bookmarks or running
-   headers). Only those pages are stored, under their page numbers in the PDF.
-3. Statements: a model copies the lines asked for, figures exactly as printed. Code keeps
-   a line only if its label is on the page and its two figures are the first two in that
-   row (current year first); it reads the unit from the page, converts to ₹ crore, and
-   does every sum. Operating, investing and financing flows must add up to the change in
-   cash, profit before tax less tax must equal profit, and full-year revenue and profit
-   are compared with the four quarterly XBRL filings. A year that fails shows "numbers
-   need a look" instead of figures. For capex, dividends and buybacks, code finds the
-   lines itself too: a sum is withheld if the model missed one, and a line is dropped if
-   code does not recognise it as part of the sum.
-4. Business, auditor and risks: quotes the model copied, kept only if they are on the
-   page; the auditor's opinion is read from the report's headings; an emphasis-of-matter
-   paragraph is cut from the text by code.
-5. Bull vs bear: a stronger model writes up to three points each way from a numbered
-   list of facts code has already checked or computed; a point is dropped if it cites no
-   fact or states a figure its facts do not contain. Both sides are always shown.
+FINN was built in a week by one person directing Claude. How the work was steered and
+checked, and what the AI got wrong along the way:
+[`docs/AI_BUILD_HISTORY.md`](docs/AI_BUILD_HISTORY.md). The day-by-day record is
+[`docs/BUILD_LOG.md`](docs/BUILD_LOG.md).
