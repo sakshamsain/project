@@ -173,12 +173,13 @@ Three lines a day: what was asked, what went wrong, what changed.
   case model failed about half its calls (rate limits and schema misses) and fell back to
   the next model, which is slow but never shows an unchecked point. Deploying the web app
   failed: the Vercel token cannot see the team that owns the project, so production still
-  shows the previous interface until the token is replaced.
+  shows the previous interface until the token is replaced. (Fixed the same evening with
+  a new token; the redesign is live.)
 - **Generalisation check:** ten companies drawn at random and built with no changes. 8
   got statements and a case (2 have no annual report on NSE); 3 file no call transcripts.
   Glenmark's four "transcripts" were one-page letters linking to its website, so the
   ledger was empty; FINN now follows such a link (decision 025) and Glenmark's ledger has
   16 promises. The eval's summary had counted a ledger with no transcripts as usable; it
   now reports the two halves separately.
-- **Next:** web deploy once Vercel access is fixed; the Ask bar; the covering note.
+- **Next:** the Ask bar; the covering note.
 
