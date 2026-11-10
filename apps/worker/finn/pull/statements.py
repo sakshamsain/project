@@ -31,24 +31,32 @@ SINGLE = [
     "pat",
     "pat_owners",
     "finance_costs",
-    "depreciation",
     "cfo",
     "cfi",
     "cff",
     "fx_effect",
     "net_change",
     "equity",
-    "borrowings_noncurrent",
-    "borrowings_current",
     "cash",
     "bank_balances",
-    "current_investments",
-    "receivables",
     "inventories",
     "total_assets",
     "total_equity_liabilities",
 ]
-MULTI = ["capex", "dividends", "buyback", "payables"]
+FLOW_SUMS = ["capex", "dividends", "buyback"]  # payments on the cash-flow statement
+SHEET_SUMS = ["borrowings", "receivables", "payables"]  # balances on the balance sheet
+MULTI = FLOW_SUMS + SHEET_SUMS
+SHEET_KEYS = frozenset(
+    [
+        "equity",
+        "cash",
+        "bank_balances",
+        "inventories",
+        "total_assets",
+        "total_equity_liabilities",
+        *SHEET_SUMS,
+    ]
+)
 KEYS = SINGLE + MULTI
 WINDOW = 160  # characters after a label in which its row's figures must appear
 
@@ -58,22 +66,21 @@ the pages you are given.
 List the lines below where they appear. For each line give:
 - key: one of the keys below
 - label: the line's label exactly as printed, without its note number
-- current: the figure in the column for the year the report covers (for the balance \
+- current: the figure in the column for the year the report covers (on the balance \
 sheet, as at the end of that year)
 - prior: the figure in the column for the year before
 - page: the number in the [[page N]] marker above the line
 Copy each figure character for character as printed, with its commas, decimals and \
 brackets, for example "2,67,021", "(12,845)" or "72,776.01". Write "-" where the column \
 shows a dash. Never add, convert, round or compute anything.
-Profit and loss:
+From the statement of profit and loss:
 - revenue: revenue from operations (for a lender, total revenue from operations)
 - pbt: profit before tax
 - tax: total tax expense
 - pat: profit for the year
 - pat_owners: profit for the year attributable to owners of the company
 - finance_costs: finance costs
-- depreciation: depreciation and amortisation expense
-Cash flows:
+From the statement of cash flows:
 - cfo: net cash from or used in operating activities
 - cfi: net cash from or used in investing activities
 - cff: net cash from or used in financing activities
@@ -84,21 +91,20 @@ intangible assets; one item for each such line
 - dividends: dividends paid, one item for each line (to owners, to non-controlling \
 interests)
 - buyback: payments to buy back shares, with their tax and expenses; one item per line
-Balance sheet:
-- equity: total equity (including non-controlling interests where the sheet shows them)
-- borrowings_noncurrent: borrowings under non-current liabilities (not lease liabilities)
-- borrowings_current: borrowings under current liabilities (not lease liabilities)
+From the balance sheet only:
+- equity: total equity
+- borrowings: each line labelled borrowings (non-current, current), one item per line; \
+not lease liabilities
 - cash: cash and cash equivalents
 - bank_balances: bank balances other than cash and cash equivalents
-- current_investments: investments under current assets
-- receivables: trade receivables under current assets
+- receivables: trade receivables, one item for each line
 - inventories: inventories
-- payables: trade payables under current liabilities, one item per line (dues of micro \
-and small enterprises, dues of others)
+- payables: trade payables, one item for each line that carries figures (dues of micro \
+and small enterprises, dues of other creditors)
 - total_assets: total assets
 - total_equity_liabilities: total equity and liabilities
-Give each key except capex, dividends, buyback and payables at most once; leave out any \
-the statements do not show."""
+Give each key at most once, except capex, dividends, buyback, borrowings, receivables \
+and payables; leave out any the statements do not show."""
 
 SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -238,12 +244,25 @@ def matched_row(current: Any, prior: Any, rows: Sequence[str]) -> tuple[float | 
 
 
 def verify_lines(
-    data: Any, pages: Mapping[int, str], balance_pages: Sequence[int] = ()
+    data: Any,
+    pages: Mapping[int, str],
+    balance_pages: Sequence[int] = (),
+    flow_pages: Sequence[int] | None = None,
 ) -> Extracted:
+    """The model's lines that code can place, plus the rows code reads itself.
+
+    `balance_pages` hold the balance sheet and `flow_pages` the other two statements (by
+    default every other page; a two-page spread can be in both). A line counts only on
+    its own statement: "trade payables" in the cash-flow statement is a change in the
+    year, not the balance."""
     unit = statement_scale([pages[n] for n in sorted(pages)])
     if unit is None:
         return Extracted([], None, ["no unit printed on the statement pages"])
     _word, scale = unit
+    sheet = {n: pages[n] for n in balance_pages if n in pages}
+    if flow_pages is None:
+        flow_pages = [n for n in pages if n not in sheet]
+    flows = {n: pages[n] for n in flow_pages if n in pages}
     out = Extracted([], _word)
     seen: set[str] = set()
     for raw in data.get("lines", []):
@@ -253,10 +272,25 @@ def verify_lines(
         if key not in KEYS or page not in pages or not label:
             out.dropped.append(f"{key}: no label or page")
             continue
+        if page not in (sheet if key in SHEET_KEYS else flows):
+            out.dropped.append(f"{key}: p. {page} is not the statement it belongs on")
+            continue
         if key in SINGLE and key in seen:
             out.dropped.append(f"{key}: listed twice")
             continue
-        if key in MULTI and not is_summed_label(key, label):
+        if key == "tax" and _TAX_PART.search(normalize(label)):
+            # Current tax alone is not the tax expense; where no total is printed the
+            # profit check falls to the quarterly filings instead.
+            out.dropped.append(f"tax: '{label[:60]}' is one part of the tax expense")
+            continue
+        if key == "equity" and not _TOTAL_EQUITY.search(normalize(label)):
+            # Owners' equity is not total equity where there are minority interests.
+            out.dropped.append(f"equity: '{label[:60]}' is not the total")
+            continue
+        if key in MULTI and not (
+            is_summed_label(key, label)
+            or (key in SHEET_SUMS and under_header(key, label, pages[page]))
+        ):
             # Code and model must agree a line belongs in a sum: an advance for a lease
             # is not capex, cash parked for a buyback is not a buyback.
             out.dropped.append(f"{key}: '{label[:60]}' is not a {key} line")
@@ -280,17 +314,130 @@ def verify_lines(
                 None if pri is None else round(pri * scale, 4),
             )
         )
-    out.added = add_code_rows(out.lines, pages, scale)
-    out.incomplete = missing_lines(out.lines, pages, scale)
-    sheet = " ".join(normalize(pages[n]) for n in balance_pages if n in pages)
-    if sheet:
-        out.absent = [key for key, word in _ABSENT_WORDS.items() if word not in sheet]
+    out.added = add_code_rows(out.lines, flows, sheet, scale)
+    out.added += add_sheet_rows(out.lines, sheet, scale)
+    out.added += add_unlabelled_equity(out.lines, sheet, scale)
+    drop_header_totals(out.lines)
+    out.incomplete = missing_lines(out.lines, flows, sheet, scale)
+    text = " ".join(normalize(t) for t in sheet.values())
+    if text:
+        out.absent = [key for key, word in _ABSENT_WORDS.items() if word not in text]
     return out
 
 
 # A balance-sheet line that is not printed at all is zero; one printed but not read is
 # unknown. Code tells the two apart by the word on the sheet.
-_ABSENT_WORDS = {"borrowings": "borrowing", "inventories": "inventor"}
+_ABSENT_WORDS = {
+    "borrowings": "borrowing",
+    "inventories": "inventor",
+    "bank_balances": "bank balance",
+}
+
+_TAX_PART = re.compile(r"^(?:\W*\(?[a-z0-9]{1,3}\)\s*)?(?:current|deferred) tax")
+_TOTAL_EQUITY = re.compile(r"total equity(?! and liabilities)(?! attributable)")
+
+# Balance-sheet lines code reads itself when the label names exactly one row.
+_SHEET_LABELS = {
+    "total_assets": re.compile(r"total assets"),
+    "total_equity_liabilities": re.compile(r"total equity and liabilities"),
+    "equity": _TOTAL_EQUITY,
+    "cash": re.compile(r"(?<!other than )cash and cash equivalents"),
+    "bank_balances": re.compile(r"other bank balances|bank balances? other than[^\d]{0,60}"),
+    "inventories": re.compile(r"inventories"),
+}
+
+
+def add_sheet_rows(lines: list[Line], sheet: Mapping[int, str], scale: float) -> list[str]:
+    """Balance-sheet lines the model left out, where the label names one row only and
+    the row prints both year-ends."""
+    added: list[str] = []
+    have = {ln.key for ln in lines}
+    for key, pattern in _SHEET_LABELS.items():
+        if key in have:
+            continue
+        rows: list[tuple[int, str, list[float | None]]] = []
+        for page, text in sorted(sheet.items()):
+            hay = normalize(text)
+            for m in pattern.finditer(hay):
+                figs = row_figures(row_tokens(row_after(hay[m.end() : m.end() + WINDOW])))
+                if len(figs) == 2:
+                    rows.append((page, m.group(0).strip(), figs))
+        if len(rows) != 1:
+            continue
+        page, label, (cur, pri) = rows[0]
+        lines.append(
+            Line(
+                key,
+                label[:1].upper() + label[1:],
+                page,
+                round((cur or 0.0) * scale, 4),
+                round((pri or 0.0) * scale, 4),
+            )
+        )
+        added.append(f"{key}: {label} (p. {page})")
+    return added
+
+
+_OWNERS_EQUITY = re.compile(r"equity attributable to[^\d]{0,70}")
+_MINORITY = re.compile(r"non-?controlling interests?")
+
+
+def add_unlabelled_equity(lines: list[Line], sheet: Mapping[int, str], scale: float) -> list[str]:
+    """Total equity where the sheet prints it as a bare sum: owners' equity, then
+    non-controlling interests, then the two added up with no label. Taken only if the
+    printed sum equals the two rows above it."""
+    if any(ln.key == "equity" for ln in lines):
+        return []
+    for page, text in sorted(sheet.items()):
+        hay = normalize(text)
+        owners = [m for m in _OWNERS_EQUITY.finditer(hay)]
+        minority = [m for m in _MINORITY.finditer(hay)]
+        if len(owners) != 1 or not minority or _TOTAL_EQUITY.search(hay):
+            continue
+        own = row_figures(row_tokens(row_after(hay[owners[0].end() : owners[0].end() + WINDOW])))
+        toks = row_tokens(row_after(hay[minority[-1].end() : minority[-1].end() + WINDOW]))
+        k = 0
+        while k < MAX_NOTE_TOKENS and len(toks) - k > 4 and _note_like(toks[k]):
+            k += 1
+        rest = toks[k : k + 4]
+        if len(own) != 2 or len(rest) != 4 or any(t is None for t in (*own, *rest)):
+            continue
+        nci, total = rest[:2], rest[2:]
+        if all(
+            abs((o or 0) + (n or 0) - (t or 0)) <= 0.02
+            for o, n, t in zip(own, nci, total, strict=True)
+        ):
+            lines.append(
+                Line(
+                    "equity",
+                    "Total equity (owners and non-controlling interests)",
+                    page,
+                    round((total[0] or 0.0) * scale, 4),
+                    round((total[1] or 0.0) * scale, 4),
+                )
+            )
+            return [f"equity: owners plus non-controlling interests, as summed on p. {page}"]
+    return []
+
+
+def drop_header_totals(lines: list[Line]) -> None:
+    """Where a sum's lines include their own total ("Trade payables 4,414" above its two
+    parts), drop the total so nothing is counted twice."""
+    for key in SHEET_SUMS:
+        mine = [ln for ln in lines if ln.key == key]
+        if len(mine) < 3:
+            continue
+        for head in mine:
+            rest = [ln for ln in mine if ln is not head]
+            same = all(
+                getattr(head, col) is not None
+                and all(getattr(ln, col) is not None for ln in rest)
+                and abs(getattr(head, col) - sum(getattr(ln, col) for ln in rest)) < 1e-6
+                for col in ("current", "prior")
+            )
+            if same:
+                lines.remove(head)
+                break
 
 
 # Lines that are summed: code finds them itself, checks the model listed each one, and
@@ -304,12 +451,15 @@ _SUMMED = {
     "dividends": re.compile(r"dividends? paid|payments? of (?:final |interim )?dividends?"),
     "buyback": re.compile(r"buy ?-?back"),
     "payables": re.compile(r"trade payables|outstanding dues of"),
+    "borrowings": re.compile(r"\bborrowings\b"),
+    "receivables": re.compile(r"trade receivables"),
 }
 
 
 # Cash parked for a buyback, or advances, are not the payment itself.
 _NOT_SUMMED = re.compile(
     r"escrow|deposit|advances? (?:for|towards|paid for)|proceeds from|received|income|refund"
+    r"|interest accrued|lease"
 )
 _LABEL_START = re.compile(r"(?:\d|\)|\s-)\s")
 
@@ -319,6 +469,35 @@ def is_summed_label(key: str, label: str) -> bool:
     return bool(_SUMMED[key].search(text)) and not _NOT_SUMMED.search(text)
 
 
+_LEADING_NOTE = re.compile(r"^\s*\d{1,2}(?:\.\d{1,2})?(?:\([a-z]\))?\s+(?=[a-z])")
+
+
+def under_header(key: str, label: str, text: str) -> bool:
+    """Whether `label` is printed as a sub-line of a line in this sum: "Unbilled" below
+    "Trade receivables / Billed". Between the heading and the label there may be one
+    other sub-line (its label and figures) and nothing else."""
+    hay = normalize(text)
+    needle = normalize(label)
+    if len(needle) < 3:
+        return False
+    start = hay.find(needle)
+    while start != -1:
+        before = hay[max(0, start - 160) : start]
+        heads = list(_SUMMED[key].finditer(before))
+        if heads:
+            between = _NOTE_REF.sub(" ", before[heads[-1].end() :])
+            between = _LEADING_NOTE.sub(" ", between)
+            word = re.search(r"[a-z]{3,}", between)
+            figure = _ROW_TOKEN.search(between)
+            # A heading with figures of its own ("Trade receivables 4,424 5,710") has no
+            # sub-lines: what follows it is another line of the balance sheet.
+            own_figures = figure is not None and (word is None or figure.start() < word.start())
+            if not own_figures and len(re.findall(r"[a-z]{3,}", between)) <= 1:
+                return True
+        start = hay.find(needle, start + 1)
+    return False
+
+
 @dataclass(frozen=True, slots=True)
 class CodeRow:
     """A summed line code found on its own: the label up to its figures, and the first
@@ -326,9 +505,10 @@ class CodeRow:
 
     page: int
     label: str
-    current: float | None
+    current: float | None  # None for a dash
     prior: float | None
     at: int  # where the row's figures start in the page's normalised text
+    columns: int = 2  # how many of the two year columns the row prints
 
 
 def row_figures(toks: Sequence[float | None]) -> list[float | None]:
@@ -339,26 +519,47 @@ def row_figures(toks: Sequence[float | None]) -> list[float | None]:
     return list(toks[k : k + 2])
 
 
+# Section headings that run into a row's label in the page text.
+_SECTION_HEADS = re.compile(
+    r"^(?:(?:[a-c][.)] ?)?(?:cash flows? (?:from|used in|generated from) (?:operating|investing"
+    r"|financing) activities:?|(?:non-)?current (?:assets|liabilities):?"
+    r"|financial (?:assets|liabilities):?|equity and liabilities|liabilities|assets) )+"
+)
+
+# Sub-lines some balance sheets print under a heading, without repeating its name.
+_SUB_LINES = {"receivables": re.compile(r"\bunbilled\b")}
+
+
 def code_rows(pages: Mapping[int, str], key: str) -> list[CodeRow]:
-    """Every row on the pages whose label names a summed line, one per row."""
+    """Every row on the pages whose label names a summed line, one per row. A heading
+    that carries only its note number ("Trade payables 14", then its two parts) is not
+    a row."""
     out: list[CodeRow] = []
     seen: set[tuple[int, int]] = set()
     for page, text in sorted(pages.items()):
         hay = normalize(text)
-        for m in _SUMMED[key].finditer(hay):
+        matches = list(_SUMMED[key].finditer(hay))
+        if key in _SUB_LINES:
+            matches += [
+                m
+                for m in _SUB_LINES[key].finditer(hay)
+                if under_header(key, m.group(0), hay[max(0, m.start() - 200) : m.end()])
+            ]
+        for m in sorted(matches, key=lambda m: m.start()):
             post = hay[m.end() : m.end() + WINDOW]
             first = _ROW_TOKEN.search(post)
             if first is None:
                 continue
             label = _LABEL_START.split(hay[max(0, m.start() - 80) : m.start()])[-1]
-            label = re.sub(r"\s+", " ", label + hay[m.start() : m.end()] + post[: first.start()])
+            label = re.sub(r"[\x00-\x1f\s]+", " ", label + m.group(0) + post[: first.start()])
             if _NOT_SUMMED.search(label) or (page, m.end() + first.start()) in seen:
                 continue
-            figs = row_figures(row_tokens(row_after(post)))
+            tokens = row_tokens(row_after(post))
+            figs = row_figures(tokens)
             if not figs:
                 continue
             seen.add((page, m.end() + first.start()))
-            label = label.strip(" -:;,")
+            label = _SECTION_HEADS.sub("", label.strip(" -:;,."))
             out.append(
                 CodeRow(
                     page,
@@ -366,9 +567,17 @@ def code_rows(pages: Mapping[int, str], key: str) -> list[CodeRow]:
                     figs[0],
                     figs[1] if len(figs) > 1 else None,
                     m.end() + first.start(),
+                    len(figs),
                 )
             )
-    return out
+    return [r for i, r in enumerate(out) if not _note_only_heading(r, out[i + 1 :])]
+
+
+def _note_only_heading(row: CodeRow, later: Sequence[CodeRow]) -> bool:
+    """A heading whose one number is its note reference, with its parts just below."""
+    if not _note_like(row.current) or row.prior not in (None, 0.0):
+        return False
+    return any(r.page == row.page and 0 < r.at - row.at <= 160 for r in later)
 
 
 def summed_rows(pages: Mapping[int, str], key: str) -> list[tuple[float | None, float | None]]:
@@ -389,23 +598,31 @@ def _covered(lines: Sequence[Line], key: str, row: CodeRow, scale: float) -> boo
 
 
 def _statement_outflow(row: CodeRow) -> bool:
-    """A row code may add on its own: both year columns printed (a dash counts) and
-    every figure an outflow in brackets, as cash-flow statements print payments. A
+    """A cash-flow row code may add on its own: both year columns printed (a dash
+    counts) and every figure an outflow in brackets, as statements print payments. A
     footnote's "includes capital advances of 120" fails and stays the model's to read."""
-    figs = [row.current, row.prior]
-    if row.prior is None and row.current is None:
-        return False
-    values = [f for f in figs if f is not None and f != 0.0]
-    return bool(values) and all(v < 0 for v in values) and row.at >= 0 and len(figs) == 2
+    values = [f for f in (row.current, row.prior) if f is not None and f != 0.0]
+    return row.columns == 2 and bool(values) and all(v < 0 for v in values)
 
 
-def add_code_rows(lines: list[Line], pages: Mapping[int, str], scale: float) -> list[str]:
+def _sheet_balance(row: CodeRow) -> bool:
+    """A balance-sheet row code may add on its own: both year-ends printed (a dash
+    counts) and no negative figure."""
+    values = [f for f in (row.current, row.prior) if f is not None and f != 0.0]
+    return row.columns == 2 and bool(values) and all(v > 0 for v in values)
+
+
+def add_code_rows(
+    lines: list[Line], flows: Mapping[int, str], sheet: Mapping[int, str], scale: float
+) -> list[str]:
     """Summed lines code found that the model left out, added to `lines` (rules before
     models: the same row rules that check the model's lines read them)."""
     added: list[str] = []
     for key in MULTI:
-        for row in code_rows(pages, key):
-            if not _statement_outflow(row) or _covered(lines, key, row, scale):
+        on_sheet = key in SHEET_SUMS
+        for row in code_rows(sheet if on_sheet else flows, key):
+            fits = _sheet_balance(row) if on_sheet else _statement_outflow(row)
+            if not fits or _covered(lines, key, row, scale):
                 continue
             lines.append(
                 Line(
@@ -421,14 +638,15 @@ def add_code_rows(lines: list[Line], pages: Mapping[int, str], scale: float) -> 
 
 
 def missing_lines(
-    lines: Sequence[Line], pages: Mapping[int, str], scale: float
+    lines: Sequence[Line], flows: Mapping[int, str], sheet: Mapping[int, str], scale: float
 ) -> dict[str, list[str]]:
     out: dict[str, list[str]] = {}
     for key in MULTI:
         listed = [ln for ln in lines if ln.key == key]
+        rows = summed_rows(sheet if key in SHEET_SUMS else flows, key)
         for column, idx in (("current", 0), ("prior", 1)):
             have = [abs(getattr(ln, column)) for ln in listed if getattr(ln, column) is not None]
-            for row in summed_rows(pages, key):
+            for row in rows:
                 v = row[idx]
                 if v is None or v == 0.0:
                     continue
@@ -445,12 +663,14 @@ def extract_statements(
     fiscal_year: str,
     basis: str,
     balance_pages: Sequence[int] = (),
+    flow_pages: Sequence[int] | None = None,
 ) -> tuple[Extracted, str]:
     year = 2000 + int(fiscal_year[2:])
     user = (
         f"Company: {company}\nAnnual report for {fiscal_year}: April {year - 1} to March {year}\n"
         f"Statements: {basis}\n\n{numbered(pages, sorted(pages))}"
     )
+    full = full_marks(with_sheet=any(n in pages for n in balance_pages))
     best: tuple[int, Extracted, str] | None = None
     for escalate in (False, True):
         res = llm.json(
@@ -464,25 +684,30 @@ def extract_statements(
             validate=_shape,
             escalate=escalate,
         )
-        ex = verify_lines(res.data, pages, balance_pages)
+        ex = verify_lines(res.data, pages, balance_pages, flow_pages)
         score = quality(ex, fiscal_year)
         if best is None or score > best[0]:
             best = (score, ex, res.model)
-        if score >= FULL_MARKS:
+        if score >= full:
             break
     assert best is not None
     return best[1], best[2]
 
 
 CORE = ("revenue", "pat", "cfo", "cfi", "cff", "net_change")
+SHEET_CORE = ("total_assets", "total_equity_liabilities", "equity")
 FULL_MARKS = 2 * len(CORE) + 4
+
+
+def full_marks(with_sheet: bool) -> int:
+    return FULL_MARKS + (2 * len(SHEET_CORE) if with_sheet else 0)
 
 
 def quality(ex: Extracted, fiscal_year: str) -> int:
     """Core lines read in both columns, plus 2 per year that adds up, less 1 per summed
     line left out: a weaker answer is asked again of the stronger model."""
     score = 0
-    for key in CORE:
+    for key in CORE + SHEET_CORE:
         line = next((ln for ln in ex.lines if ln.key == key), None)
         if line is not None:
             score += int(line.current is not None) + int(line.prior is not None)
@@ -615,31 +840,17 @@ class CashYear:
     balance_failures: list[str] = field(default_factory=list)
 
 
-BALANCE_KEYS = (
-    "equity",
-    "borrowings_noncurrent",
-    "borrowings_current",
-    "cash",
-    "bank_balances",
-    "current_investments",
-    "receivables",
-    "inventories",
-    "total_assets",
-    "total_equity_liabilities",
-)
-
-
 def balance_year(y: Year, lender: bool) -> tuple[dict[str, float | None], list[str]]:
     """Balance-sheet figures and the ratios code makes from them, for one year-end.
 
-    Shown only if total assets equal total equity and liabilities. Working-capital days
-    are on revenue (the year-end balance over the year's revenue, times 365), since the
-    statements give no cost of goods sold in one line. Return on capital employed is
-    EBIT (profit before tax plus finance costs) over year-end equity plus borrowings.
-    Lenders get equity and assets only: debt and working capital mean other things for
-    a bank or an NBFC."""
+    Shown only if total assets equal total equity and liabilities. Net debt is
+    borrowings less cash and bank balances (investments are not netted off, so the
+    figure means the same for every company). Working-capital days are on revenue: the
+    year-end balance over the year's revenue, times 365. Return on capital employed is
+    profit before tax plus finance costs, over year-end equity plus borrowings. Lenders
+    get equity and assets only: debt and working capital mean other things for a bank."""
     v = y.values
-    if not any(k in v for k in BALANCE_KEYS):
+    if not (SHEET_KEYS & (set(v) | set(y.parts))):
         return {}, []
     failures: list[str] = []
     assets, liabilities = v.get("total_assets"), v.get("total_equity_liabilities")
@@ -648,43 +859,40 @@ def balance_year(y: Year, lender: bool) -> tuple[dict[str, float | None], list[s
     elif not _close(assets, liabilities, y.scale, rel=0.001):
         failures.append("balance_sheet_does_not_balance")
     equity = v.get("equity")
-    if equity is not None and assets is not None and abs(equity) > assets * 1.0001:
-        failures.append("equity_larger_than_assets")
+    if equity is not None and assets is not None and equity >= assets:
+        failures.append("equity_not_below_assets")
     out: dict[str, float | None] = {"equity": equity, "total_assets": assets}
     if lender or failures:
         return out, failures
 
-    def r(x: float | None, digits: int = 0) -> float | None:
-        return None if x is None else round(x, digits)
+    def zero_if_absent(key: str, value: float | None) -> float | None:
+        absent = key in y.absent and key not in y.incomplete
+        return 0.0 if value is None and absent else value
 
-    if "borrowings_noncurrent" in v or "borrowings_current" in v:
-        debt: float | None = v.get("borrowings_noncurrent", 0.0) + v.get("borrowings_current", 0.0)
-    else:
-        debt = 0.0 if "borrowings" in y.absent else None
-    liquid = None
-    if "cash" in v:
-        liquid = v["cash"] + v.get("bank_balances", 0.0) + v.get("current_investments", 0.0)
+    debt = zero_if_absent("borrowings", y.get("borrowings"))
+    bank = zero_if_absent("bank_balances", v.get("bank_balances"))
+    cash = None if "cash" not in v or bank is None else v["cash"] + bank
+    inventories = zero_if_absent("inventories", v.get("inventories"))
     revenue = v.get("revenue")
 
     def days(x: float | None) -> float | None:
         return None if x is None or not revenue or revenue <= 0 else round(x / revenue * 365)
 
-    inventories = v.get("inventories", 0.0 if "inventories" in y.absent else None)
-    rec, inv, pay = days(v.get("receivables")), days(inventories), days(y.get("payables"))
-    ebit = v["pbt"] + v["finance_costs"] if "pbt" in v and "finance_costs" in v else None
+    rec, inv, pay = days(y.get("receivables")), days(inventories), days(y.get("payables"))
     finance = v.get("finance_costs")
+    ebit = None if "pbt" not in v or finance is None else v["pbt"] + finance
     capital = None if equity is None or debt is None else equity + debt
     out.update(
-        debt=r(debt, 2),
-        liquid=r(liquid, 2),
-        net_debt=None if debt is None or liquid is None else round(debt - liquid, 2),
+        borrowings=None if debt is None else round(debt, 2),
+        cash_and_bank=None if cash is None else round(cash, 2),
+        net_debt=None if debt is None or cash is None else round(debt - cash, 2),
         debt_to_equity=None
         if debt is None or not equity or equity <= 0
         else round(debt / equity, 2),
         receivable_days=rec,
         inventory_days=inv,
         payable_days=pay,
-        cash_cycle_days=None if None in (rec, inv, pay) else (rec or 0) + (inv or 0) - (pay or 0),
+        cash_cycle_days=None if rec is None or inv is None or pay is None else rec + inv - pay,
         interest_cover=None
         if ebit is None or not finance or finance <= 0
         else round(ebit / finance, 1),

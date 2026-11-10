@@ -82,11 +82,13 @@ def test_build_annual_stores_each_section(infy: str, monkeypatch: pytest.MonkeyP
         "missing",
     ]
     assert doc[0]["doc_type"] == "annual_report" and doc[0]["period"] == "FY26"
-    assert doc[0]["pages"] == 384 and 0 < doc[0]["kept"] < 30  # only the pages read
+    assert doc[0]["pages"] == 384 and 0 < doc[0]["kept"] < 45  # only the parts read
     cash = sections["cash"]
     assert cash["basis"] == "consolidated"
     assert [y["fiscal_year"] for y in cash["years"]] == ["FY26", "FY25"]
     assert cash["years"][0]["document_id"] == doc[0]["id"]
+    assert cash["years"][0]["balance"]["equity"] == 93297.0
+    assert cash["years"][0]["balance_failures"] == []
     assert sections["auditor"]["kind"] == "unmodified"
     case = sections["case"]
     assert case["bull"] or case["bear"]

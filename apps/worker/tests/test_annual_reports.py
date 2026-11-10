@@ -105,9 +105,10 @@ def test_only_read_pages_are_kept() -> None:
     pages, outline = full_pages("INFY_FY26")
     s = find_sections(pages, outline)
     kept = s.pages()
-    assert 295 in kept and 143 in kept and 277 in kept
-    assert len(kept) < 30
-    assert set(kept) <= set(page_map("INFY_FY26"))
+    assert 295 in kept and 143 in kept and 277 in kept and 286 in kept
+    assert set(range(76, 91)) <= set(kept)  # the whole MD&A
+    assert len(kept) < 45
+    assert set(kept) - set(range(76, 91)) <= set(page_map("INFY_FY26"))
 
 
 def test_a_report_too_large_or_unfetchable_is_skipped_not_fatal() -> None:

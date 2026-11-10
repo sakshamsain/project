@@ -32,7 +32,7 @@ MAX_GAP = 400  # characters allowed between ellipsis fragments
 def normalize(text: str) -> str:
     t = unicodedata.normalize("NFKC", text).translate(_TRANSLATE)
     t = re.sub(r"(\w)-\s*\n\s*(\w)", r"\1\2", t)  # re-join words hyphenated across lines
-    t = re.sub(r"\s+", " ", t)
+    t = re.sub(r"[\x00-\x1f\s]+", " ", t)  # control characters some PDFs use as bullets
     return t.strip().lower()
 
 

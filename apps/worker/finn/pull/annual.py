@@ -139,12 +139,12 @@ def cash_facts(cash: Mapping[str, Any]) -> list[Fact]:
         if b.get("net_debt") is not None:
             if b["net_debt"] <= 0:
                 text = (
-                    f"At {end}, cash and liquid investments exceeded borrowings by "
+                    f"At {end}, cash and bank balances exceeded borrowings by "
                     f"₹{crore(-b['net_debt'])} crore (net cash)."
                 )
             else:
                 text = (
-                    f"At {end}, borrowings exceeded cash and liquid investments by "
+                    f"At {end}, borrowings exceeded cash and bank balances by "
                     f"₹{crore(b['net_debt'])} crore"
                     + (
                         f"; debt was {b['debt_to_equity']:g} times equity."
@@ -406,7 +406,13 @@ def build_annual(
         say(f"Checking the {r.ref.fiscal_year} balance sheet, profit and cash flows")
         try:
             ex, model = extract_statements(
-                llm, pm, name, r.ref.fiscal_year, sec.basis, sec.balance_sheet
+                llm,
+                pm,
+                name,
+                r.ref.fiscal_year,
+                sec.basis,
+                sec.balance_sheet,
+                sec.profit_and_loss + sec.cash_flow,
             )
         except LlmError as exc:
             statement_notes.append({"fiscal_year": r.ref.fiscal_year, "error": str(exc)[:300]})

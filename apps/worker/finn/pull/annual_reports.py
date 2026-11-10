@@ -12,8 +12,8 @@ are found by what is on the page rather than by page number:
                                  bookmarks or from the running header its pages carry
 
 Consolidated statements are used when the company files them, as for quarterly results.
-Only the pages FINN reads are stored, under their page numbers in the PDF, so a citation
-"p. 295" opens the original at that page.
+Only these parts are stored (40 to 60 pages of a report's 300 to 600), under their page
+numbers in the PDF, so a citation "p. 295" opens the original at that page.
 """
 
 from __future__ import annotations
@@ -337,7 +337,7 @@ class Sections:
             self.balance_sheet,
             self.auditor,
             self.business,
-            self.risks,
+            self.mdna,  # the whole discussion, so questions can be asked of it
         ):
             keep.update(part)
         return sorted(keep)

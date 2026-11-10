@@ -38,6 +38,7 @@ class PdfText:
 def clean_page(text: str) -> str:
     s = text.replace("­", "").replace("ﬁ", "fi").replace("ﬂ", "fl")
     s = re.sub(r"[ \t ]+", " ", s)
+    s = re.sub(r"[\x00-\x08\x0b-\x1f]", " ", s)  # bullets some PDFs encode as control characters
     s = re.sub(r"\n\s*\n+", "\n\n", s)
     return s.strip()
 
