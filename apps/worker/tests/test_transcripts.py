@@ -51,3 +51,59 @@ def test_one_transcript_per_quarter_newest_first() -> None:
     q1 = ann("Transcript of earnings call", "2026-07-28", "https://nsearchives.nseindia.com/c.pdf")
     refs = transcript_refs([q1, q2, q2_fix])
     assert [r.url.rsplit("/", 1)[-1] for r in refs] == ["b.pdf", "c.pdf"]
+
+
+def _fixture_pages(name: str) -> list[str]:
+    import json
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[3] / "fixtures" / "nse" / "transcripts" / name
+    return list(json.loads(path.read_text())["pages"])
+
+
+def test_a_letter_that_links_to_the_transcript_yields_the_link() -> None:
+    from finn.pull.transcripts import linked_transcript_url
+
+    pages = _fixture_pages("GLENMARK_cover_letter.json")
+    assert linked_transcript_url(pages) == (
+        "https://glenmark.b-cdn.net/gpl_pdfs/Financials/Quarterly/Glenmark-Earnings-Nov06-2026.pdf"
+    )
+
+
+def test_a_real_transcript_is_not_a_cover_letter() -> None:
+    from finn.pull.transcripts import linked_transcript_url
+
+    call = [
+        "Transcript of the Q2 FY27 earnings call. Visit https://www.infosys.com/investors.html",
+        "Moderator: Good evening ...",
+        "Salil Parekh: Our operating margin guidance remains at 20% to 22% ...",
+    ]
+    assert linked_transcript_url(call) is None
+    assert linked_transcript_url([]) is None
+
+
+def test_wrapped_links_are_rejoined_and_exchange_links_ignored() -> None:
+    from finn.pull.transcripts import linked_transcript_url
+
+    letter = [
+        "Sub: Transcript of the Earnings Call\n"
+        "Copy filed with https://www.nseindia.com and https://www.bseindia.com.\n"
+        "The transcript is available at https://www.example-co.in/investors/\n"
+        "Q2FY27_Call_Transcript.pdf.\n"
+    ]
+    assert linked_transcript_url(letter) == (
+        "https://www.example-co.in/investors/Q2FY27_Call_Transcript.pdf"
+    )
+    no_hyphen = ["Transcript of earnings call at https://x.example.com/files/Q2\nCall.pdf\n"]
+    assert linked_transcript_url(no_hyphen) == "https://x.example.com/files/Q2Call.pdf"
+
+
+def test_a_letter_without_a_pdf_link_needs_transcript_wording_near_the_link() -> None:
+    from finn.pull.transcripts import linked_transcript_url
+
+    page_link = [
+        "The transcript of the earnings call is uploaded at https://co.example.com/investor-relations"
+    ]
+    assert linked_transcript_url(page_link) == "https://co.example.com/investor-relations"
+    unrelated = ["Transcript to follow.\n" + "x " * 300 + "\nW: https://www.co.example.com"]
+    assert linked_transcript_url(unrelated) is None

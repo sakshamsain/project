@@ -15,7 +15,8 @@ def test_tiers_come_from_models_yaml() -> None:
 
 def test_shadow_cost_uses_list_prices_only_when_known() -> None:
     assert shadow_cost("gemini-3.1-flash-lite", 1_000_000, 0) == pytest.approx(0.25)
-    assert shadow_cost("gemini-3.6-flash", 1_000_000, 1_000_000) == 0.0  # price not verified
+    assert shadow_cost("gemini-3.6-flash", 1_000_000, 1_000_000) == pytest.approx(9.0)
+    assert shadow_cost("no-such-model", 1_000_000, 1_000_000) == 0.0  # price not verified
 
 
 def _gemini_ok(text: str) -> dict[str, Any]:

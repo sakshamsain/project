@@ -97,6 +97,73 @@ def find_transcripts(
     return transcript_refs(parse_announcements(rows))
 
 
+_URL_START = re.compile(r"https?://", re.I)
+_URL_BODY = re.compile(r"[^\s<>\"'()\[\]]+")
+_URL_TRAIL = ".,;:"
+_URL_JOIN = "-/_.=?&%"
+COVER_LETTER_MAX_PAGES = 2
+
+
+def _urls(text: str) -> list[str]:
+    """URLs in a page of PDF text, rejoined where the PDF wrapped them across lines.
+
+    A URL is continued on the next line when its line ends in a character a URL breaks
+    after (`-`, `/`, `_` ...), or when the next line is a single token ending in `.pdf`.
+    """
+    out: list[str] = []
+    for m in _URL_START.finditer(text):
+        lines = text[m.start() :].split("\n")
+        url = _URL_BODY.match(lines[0].strip())
+        if not url:
+            continue
+        s = url.group(0)
+        for nxt in lines[1:4]:
+            nxt = nxt.strip()
+            part = _URL_BODY.match(nxt)
+            if not part or s.lower().endswith(".pdf"):
+                break
+            whole_token = part.group(0) == nxt
+            if s[-1] in _URL_JOIN or (
+                whole_token and nxt.lower().rstrip(_URL_TRAIL).endswith(".pdf")
+            ):
+                s += part.group(0)
+                if not whole_token:
+                    break
+            else:
+                break
+        out.append(s.rstrip(_URL_TRAIL))
+    return out
+
+
+def linked_transcript_url(pages: Sequence[str]) -> str | None:
+    """The transcript's address when the filing is only a letter pointing to it.
+
+    Some companies file a one-page letter saying the transcript "has been uploaded on the
+    Company's website at <link>". Returns the first link to a PDF in such a letter (or the
+    first link at all when none ends in .pdf); None for a real transcript.
+    """
+    if not pages or len(pages) > COVER_LETTER_MAX_PAGES:
+        return None
+    text = "\n".join(pages)
+    if not _TRANSCRIPT.search(text):
+        return None
+    urls = [
+        u
+        for u in _urls(text)
+        if "nseindia.com" not in u.lower() and "bseindia.com" not in u.lower()
+    ]
+    pdfs = [u for u in urls if u.lower().split("?")[0].endswith(".pdf")]
+    if pdfs:
+        return pdfs[0]
+    # a link to a page, not a file: only if the letter says the transcript is there
+    near = [
+        u
+        for u in urls
+        if re.search(r"transcript[^\n]{0,400}" + re.escape(u[:20]), text, re.I | re.S)
+    ]
+    return near[0] if near else None
+
+
 def store_document(
     conn: Conn,
     isin: str,

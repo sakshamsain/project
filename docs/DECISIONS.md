@@ -153,3 +153,12 @@ database small enough for on-demand research on any ticker. Every citation opens
 copy of the page with the quote marked, and links the PDF at that page; transcript
 quotes in the ledger use the same view.
 
+
+## 025 · Follow a filing's link to its transcript, and nothing further
+Some companies (Glenmark, found by the generalisation eval) file with NSE only a letter
+saying the transcript is on their website. That transcript is still the company's own
+record of the call, so FINN reads it: when a transcript filing is at most two pages,
+mentions a transcript and links a PDF away from the exchanges, FINN fetches that one link
+and cites it, keeping the NSE filing alongside. The link comes from a document, so the
+fetch is guarded: public HTTP(S) host names only, every redirect rechecked, a size cap,
+and the response must be a PDF. No other web page is ever read.

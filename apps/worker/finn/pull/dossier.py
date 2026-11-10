@@ -21,8 +21,15 @@ from finn.pull.financials import lines_by_label, quarterly_results, store_quarte
 from finn.pull.fiscal import parse_period
 from finn.pull.guidance import PROMPT_VERSION, GuidanceItem, extract_guidance
 from finn.pull.ledger import Promise, check
-from finn.pull.transcripts import TranscriptRef, find_transcripts, store_document, stored_pages
+from finn.pull.transcripts import (
+    TranscriptRef,
+    find_transcripts,
+    linked_transcript_url,
+    store_document,
+    stored_pages,
+)
 from finn.push.results_math import StatementLines
+from finn.sources.linked import LinkRefused, fetch_linked_pdf
 from finn.sources.pdf import NotAPdf, pdf_text
 
 
@@ -142,6 +149,7 @@ def build_dossier(
     today: date | None = None,
     progress: Callable[[str], None] | None = None,
     annual: bool = True,
+    fetch_linked: Callable[[str], bytes | None] | None = None,
 ) -> dict[str, Any]:
     from finn.core.db import connect
 
@@ -162,6 +170,42 @@ def build_dossier(
         if basis:
             store_quarters(conn, isin, basis, quarters)
 
+    def load(
+        doc_url: str, fetch: Callable[[str], bytes | None], ref: TranscriptRef
+    ) -> tuple[int | None, list[str], str | None]:
+        """Stored pages of a transcript, fetching and storing it the first time.
+        Returns (document id, pages, status when it cannot be read)."""
+        with connect(url) as conn:
+            doc_id = existing_document(conn, doc_url)
+            pages = stored_pages(conn, doc_id) if doc_id else []
+        if pages:
+            return doc_id, pages, None
+        try:
+            data = fetch(doc_url)
+        except (LinkRefused, OSError, ValueError) as exc:
+            say(f"Could not fetch {doc_url}: {type(exc).__name__}")
+            data = None
+        if data is None:
+            return None, [], "missing"
+        try:
+            text = pdf_text(data)
+        except NotAPdf:
+            return None, [], "not a pdf"
+        with connect(url) as conn:
+            doc_id = store_document(
+                conn,
+                isin,
+                "transcript",
+                doc_url,
+                ref.title,
+                ref.filed_at_date,
+                ref.period,
+                text.pages,
+                text.scanned,
+            )
+        return doc_id, text.pages, ("scanned" if text.scanned else None)
+
+    follow = fetch_linked or fetch_linked_pdf
     docs: list[dict[str, Any]] = []
     for ref in refs:
         entry: dict[str, Any] = {
@@ -169,35 +213,21 @@ def build_dossier(
             "filed_on": ref.filed_at_date.isoformat(),
             "url": ref.url,
         }
-        with connect(url) as conn:
-            doc_id = existing_document(conn, ref.url)
-            pages = stored_pages(conn, doc_id) if doc_id else []
-        if not pages:
-            data = src.fetch_bytes(ref.url)
-            if data is None:
-                docs.append({**entry, "status": "missing"})
-                continue
-            try:
-                text = pdf_text(data)
-            except NotAPdf:
-                docs.append({**entry, "status": "not a pdf"})
-                continue
-            pages = text.pages
-            with connect(url) as conn:
-                doc_id = store_document(
-                    conn,
-                    isin,
-                    "transcript",
-                    ref.url,
-                    ref.title,
-                    ref.filed_at_date,
-                    ref.period,
-                    pages,
-                    text.scanned,
-                )
-            if text.scanned:
-                docs.append({**entry, "status": "scanned", "pages": len(pages)})
-                continue
+        doc_id, pages, problem = load(ref.url, src.fetch_bytes, ref)
+        link = None if problem else linked_transcript_url(pages)
+        if link:
+            # The filing is a letter pointing to the transcript on the company's site:
+            # read and cite the transcript itself.
+            say(
+                f"The {ref.period.replace('FY', ' FY')} filing links to the transcript; fetching it"
+            )
+            entry = {**entry, "url": link, "filing_url": ref.url}
+            doc_id, pages, problem = load(link, follow, ref)
+            if problem == "missing":
+                problem = "link not readable"
+        if problem:
+            docs.append({**entry, "status": problem, **({"pages": len(pages)} if pages else {})})
+            continue
         say(f"Reading the {ref.period.replace('FY', ' FY')} call ({len(pages)} pages)")
         verified, model = extract_guidance(llm, pages, name, ref.filed_at_date, ref.period)
         with connect(url) as conn:
